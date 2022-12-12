@@ -97,7 +97,7 @@ Mouthful absurd. If the above is not true it is possible to:
 - define $\pi'(s)$ that modifies the policy for all states with the above rule 
 - new policy chooses the action that maximizes the state value function for every $s$. 
 - calculate the value function with this new policy  
-- when we encounter each state again the new policy is going to kick in. Since it always gives more reward, and since the value function is composed by discounted rewards, we now have a higher value function policy. Hence an absurd, since $v_*$ was already the optimal. 
+- when we encounter each state again the new policy is going to kick in. Since it always gives more reward, and since the value function is composed by discounted rewards, we now have a higher value function policy. Hence an absurd, since $v_{\*}$ was already the optimal. 
   
 If this is still not clear was a mouthful see that 
 
@@ -120,7 +120,7 @@ It is precisely the policy improvement theorem the one that guarantees  that the
 As Sutton, illustrates the Policy Iteration algorithm consists of the following 
 
 $$\color{orange}
-\pi_0 \overset{\mathbb{E}}{\longrightarrow} v_{\pi_0} \overset{\mathbb{I}}{\longrightarrow} \pi_1 \overset{\mathbb{E}}{\longrightarrow} \cdots \overset{\mathbb{I}}{\longrightarrow} \pi_{\*} \overset{\mathbb{E}}{\longrightarrow} v_{\pi_*}
+\pi_0 \overset{\mathbb{E}}{\longrightarrow} v_{\pi_0} \overset{\mathbb{I}}{\longrightarrow} \pi_1 \overset{\mathbb{E}}{\longrightarrow} \cdots \overset{\mathbb{I}}{\longrightarrow} \pi_{\*} \overset{\mathbb{E}}{\longrightarrow} v_{\pi_{\*}}
 $$
 
 So this particular solution is quite costly since we have to perform an evaluation step every single time the policy changes, and this is costly, mostly in iterative settings. But there are good news, that is Value Iteration.
