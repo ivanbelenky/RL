@@ -64,8 +64,8 @@ it is easy to show that $\operatorname{B_{\pi}}$ is a contraction mapping under 
 
 $$\color{orange}
 \begin{aligned}
-\left|\left|\operatorname{B_{\pi}}[v] - \operatorname{B_{\pi}}[u]\right|\right|_\infty  &= \\
-&= \gamma \left|\left| \sum_{a \in A} \pi(a|s) \sum_{s', r} p(s,r|s',a)[v(s') - u(s')]\right|\right|_\infty \\
+\left|\left|\operatorname{B_{\pi}}[v] - \operatorname{B_{\pi}}[u]\right|\right|_\infty  &= \\ \\
+&= \gamma \left|\left| \sum_{a \in A} \pi(a|s) \sum_{s', r} p(s,r|s',a)[v(s') - u(s')]\right|\right|_\infty \\ \\ 
 &\leq \gamma ||v - u||_\infty
 \end{aligned}
 $$
@@ -107,7 +107,7 @@ v_{\pi}(s) &\leq q_{\pi}(s, \pi'(s)) \\
 &= \mathbb{E_{\pi'}}[r+\gamma v_{\pi}(s')]\\
 &\leq \mathbb{E_{\pi'}}[r+\gamma q_{\pi}(s', \pi'(s'))]\\
 &= \mathbb{E_{\pi'}}[r+\gamma r + \gamma^2 v_{\pi}(s', \pi'(s'))]\\
-& \ \ \vdots\\
+& \ \ \vdots \\ 
 &\leq \mathbb{E_{\pi'}}\left[\sum_k r_k \gamma^k \right]\\
 &= v_{\pi'(s)}(s)
 \end{aligned}
@@ -147,8 +147,8 @@ then
 
 $$\color{orange}
 \begin{aligned}
-\left|\left|\operatorname{B_{\*}}[v] - \operatorname{B_{\*}}[u]\right|\right|_\infty  &= \\
-&= \gamma \left|\left| \max_a \sum_{s', r} p(s,r|s',a)[v(s') - u(s')]\right|\right|_\infty \\
+\left|\left|\operatorname{B_{\*}}[v] - \operatorname{B_{\*}}[u]\right|\right|_\infty  &= \\ \\
+&= \gamma \left|\left| \max_a \sum_{s', r} p(s,r|s',a)[v(s') - u(s')]\right|\right|_\infty \\ \\
 &\leq \gamma ||v - u||_\infty
 \end{aligned}
 $$
