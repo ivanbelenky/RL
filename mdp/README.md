@@ -89,8 +89,9 @@ $$
 As the title suggest, dynamic programming also encompasses methods to solve the optimal problem, that is the best policy there is given an MDP. In the same fashion we can define Optimality Equations for the value function. It can be easily proven by the absurd that the following is true for 
 
 $$\color{orange}
-v_{*} = \max_{a \in A} q_{\pi_*}(s,a) = \max_{a \in A} \sum_{s', r} p(s,r|s',a)[ r + \gamma v_{*}(s')]
+v_{*} = \max_{a \in A} q_{\pi_{*}}(s,a) = \max_{a \in A} \sum_{s', r} p(s,r|s',a)[ r + \gamma v_{*}(s')]
 $$
+
 
 Mouthful absurd. If the above is not true it is possible to:
 - define $\pi'(s)$ that modifies the policy for all states with the above rule 
