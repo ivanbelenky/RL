@@ -65,7 +65,7 @@ it is easy to show that $\operatorname{B_{\pi}}$ is a contraction mapping under 
 $$\color{orange}
 \begin{aligned}
 \left|\left|\operatorname{B_{\pi}}[v] - \operatorname{B_{\pi}}[u]\right|\right|_\infty  &= \\ \\
-&= \gamma \left|\left| \sum_{a \in A} \pi(a|s) \sum_{s', r} p(s,r|s',a)[v(s') - u(s')]\right|\right|_\infty \\ \\ 
+&= \gamma \|\| \sum_{a \in A} \pi(a|s) \sum_{s', r} p(s,r|s',a)[v(s') - u(s')]\|\|_\infty \\ \\ 
 &\leq \gamma ||v - u||_\infty
 \end{aligned}
 $$
@@ -148,7 +148,7 @@ then
 $$\color{orange}
 \begin{aligned}
 \left|\left|\operatorname{B_{\*}}[v] - \operatorname{B_{\*}}[u]\right|\right|_\infty  &= \\ \\
-&= \gamma \left|\left| \max_a \sum_{s', r} p(s,r|s',a)[v(s') - u(s')]\right|\right|_\infty \\ \\
+&= \gamma \|\| \max_a \sum_{s', r} p(s,r|s',a)[v(s') - u(s')]\|\|_\infty \\ \\
 &\leq \gamma ||v - u||_\infty
 \end{aligned}
 $$
