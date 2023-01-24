@@ -96,3 +96,11 @@ def value_iteration(
 
     policy.update_policy(qᵢ)
     
+
+def first_visit_monte_carlo(
+    MC,
+    policy: Policy,
+    tol: float = TOL,
+    max_episodes: int = MAX_ITER) -> np.ndarray:
+
+    raise NotImplementedError

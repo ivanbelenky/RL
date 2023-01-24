@@ -9,15 +9,14 @@ including without limitation the rights to  use, copy, modify, merge, publish,
 distribute, sublicense, and/or sell copies of this.
 '''
 
-from typing import Tuple, Union, List
+from typing import Tuple, List
 from abc import ABC, abstractmethod
 
 import numpy as np
-import numpy.random as rnd
 
 from policy import Policy
 from reward import RewardGenerator
-from mdp.solvers import (
+from solvers import (
     vq_π_iter_naive,
     policy_iteration,
     value_iteration

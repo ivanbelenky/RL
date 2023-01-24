@@ -167,6 +167,25 @@ $$
 
 Since we are guaranteed convergence, we can basically apply policy iteration but going for iterative policy evaluation just with one step.  
 
+
+### **Drawbacks of DP**
+
+It is evident that for problems with massive state,action spaces, even with high power compute, DP is not a cost-effective solution. This is because the time complexity of DP is polynomial in the size of the state and action space (assuming the action space stays constant, if it also grows, even worse naturally).
+
+Asynchronous DP is a solution to this problem, mainly as the name suggests it suggests that there is not a synchronicity of updates between improvement steps. As Sutton states _"Of course, avoiding sweeps does not necessarily mean that we can get away with less computation. It just means that an algorithm does not need to get locked into any hopeleslly long sweep before it can make progress improving a policy"_. 
+
+A few words on Generalized Policy Iteration. 
+
+![](/assets/images/2023-01-24-11-04-28.png)
+
+There is a nice inutition behind what is going on whenever we are performing any of the methods described above. By the word greedy, we are stating, that we are going to choose the action that maximizes the value function for the next state locally, not taking into account that we might be selecting this policy with regards to an _outdated_ value function. But given the niceness of the Operators, and by niceness I mean, they are contraction mappings, we are left with the following picture  
+
+![](/assets/images/2023-01-24-11-04-11.png)
+
+Each of the steps in GPI fights in opposite directions, the policy improvement is pushing the policy to the greedy optimal solution, and by doing so, making the current value function invalid in some sense. The value function just corrects this invalidity, and by doing so, lets everybody know that the current policy is not optimal. For the techniques shown, given that there is a contraction mapping, and guaranteed convergence to the unique optimal solution, it could be argued that the value function space is convex. 
+
+
+
 <br>
 <br>
 
