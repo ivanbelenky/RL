@@ -3,6 +3,9 @@ from typing import Any, Union, List
 
 class Action(ABC):
     @abstractmethod
-    def get_index(self, action) -> Any:
+    def get_index(self, action) -> int:
         raise NotImplementedError
     
+    @abstractmethod
+    def from_index(self, action) -> Any:
+        raise NotImplementedError
