@@ -7,6 +7,7 @@ from numpy.linalg import norm as lnorm
 
 from policy import Policy 
 
+MAX_STEPS = 1E3
 MAX_ITER = int(1E4)
 TOL = 1E-6
 
@@ -110,28 +111,34 @@ def every_visit_monte_carlo(MC, policy, max_episodes):
 
 
 def _visit_monte_carlo(
-    MC,
+    MF,
     policy: Policy = None,
     max_episodes: int = MAX_ITER,
-    first_visit = True) -> np.ndarray:
+    max_steps: int = MAX_STEPS,
+    first_visit = True,
+    exploring_starts = False) -> np.ndarray:
     '''
         Needless to say the inefficiency of the underlying implementation.
         By no means it was a goal to provide an efficient implementation 
         time/space wise. The goal was readability.
     '''
 
-    policy = policy if policy else MC.policy
+    policy = policy if policy else MF.policy
     
     n_episode = 0
 
-    v, q = {}, {}
-    n_s, n_sa = {}, {}
+    v, q = np.zeros(MF.state.S), np.zeros((MF.action.A, MF.state.S))
+    n_s, n_sa = np.zeros(MF.state.S), np.zeros((MF.action.A, MF.state.S))
 
-    γ = MC.gamma
+    γ = MF.gamma
 
+    s_0, a_0 = MF.random_sa()
     while n_episode < max_episodes:
-        episode = MC.generate_episode(policy)
-        G = 0 
+        if exploring_starts:
+            s_0, a_0 = MF.random_sa()
+
+        episode = MF.generate_episode(policy ,s_0, a_0, max_steps)
+        G = 0
         sar = np.array(episode)
         s, a, r = sar[:,0], sar[:,1], sar[:,2]
 
@@ -139,14 +146,16 @@ def _visit_monte_carlo(
             G = γ*G + r_tt
             
             if s_t not in s[:t] or not first_visit:
-                n_s[s_t] = n_s.get(s_t, 0) + 1
-                v[s_t] = v.get(s_t, 0) + (G - v.get(s_t, 0))/n_s[s_t]
+                n_s[s_t] = n_s[s_t] + 1
+                v[s_t] = v[s_t] + (G - v[s_t])/n_s[s_t]
             
             q_key = (s_t, a_t)
-            if (s_t,a_t) not in zip(s[:t],a[:t]) or not first_visit:    
-                n_sa[(s_t,a_t)] = n_sa.get((s_t,a_t), 0) + 1
-                q[q_key] = q.get(q_key, 0) + (G - q.get(q_key, 0))/n_sa[q_key]
+            if q_key not in zip(s[:t],a[:t]) or not first_visit:    
+                n_sa[q_key] = n_sa[q_key] + 1
+                q[q_key] = q[q_key] + (G - q[q_key])/n_sa[q_key]
 
         n_episode += 1
 
     return v, q
+
+
