@@ -28,6 +28,9 @@ from action import Action
 from solvers import (
     first_visit_monte_carlo,
     every_visit_monte_carlo,
+    off_policy_first_visit,
+    off_policy_every_visit,
+    tdn,
     MAX_STEPS
 )
 
@@ -44,11 +47,10 @@ class ModelFreePolicy(Policy):
 
     def __call__(self, state: int):
         return np.random.choice(self.A, p=self.pi[state])
-        
-    def update_policy(self):
+
+    def update_policy(self, q):
         pass
-
-
+        
 
 class ModelFree:
     '''
@@ -63,6 +65,9 @@ class ModelFree:
     VQ_PI_SOLVERS = {
         'first_visit': first_visit_monte_carlo,
         'every_visit': every_visit_monte_carlo, 
+        'off_policy_first_visit': off_policy_first_visit,
+        'off_policy_first_visit': off_policy_every_visit,
+        'temporal_difference': tdn,
     }
 
     OPTIMAL_POLICY_SOLVERS = {
