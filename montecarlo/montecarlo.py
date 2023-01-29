@@ -9,7 +9,7 @@ including without limitation the rights to  use, copy, modify, merge, publish,
 distribute, sublicense, and/or sell copies of this.
 '''
 
-from typing import Tuple, List, Any, Union
+from typing import Tuple, Union, NewType
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -22,6 +22,7 @@ from solvers import (
     first_visit_monte_carlo,
 )
 
+EpisodeStep = NewType('EpisodeStep', Tuple[Union[int, State], Union[int, Action], float])
 
 class MC(ABC):
     '''
@@ -59,7 +60,6 @@ class MC(ABC):
     def _validate_attr(self):
         if isinstance(self.states, int):
             self.states = np.arange(self.states)
-            not_int_sa = True
         if isinstance(self.actions, Action):
             self.actions = np.arange(self.actions)
         
@@ -82,10 +82,8 @@ class MC(ABC):
     @abstractmethod
     def transition(self, 
         state: Union[int, State], 
-        action: Union[int, Action]) -> Tuple[
-            Tuple[Union[int, State], 
-            Union[int, Action], 
-            float], bool]:
+        action: Union[int, Action]
+        ) -> Tuple[EpisodeStep, bool]:
         '''
             The transition method will determine how the world reacts to a
             state action pair 
