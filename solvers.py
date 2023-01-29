@@ -104,12 +104,12 @@ def value_iteration(
     
 
 
-def first_visit_monte_carlo(MC, policy, max_episodes):
-    return _visit_monte_carlo(MC, policy, max_episodes, first_visit = True)
+def first_visit_monte_carlo(MF, policy, max_episodes):
+    return _visit_monte_carlo(MF, policy, max_episodes, first_visit = True)
 
 
-def every_visit_monte_carlo(MC, policy, max_episodes):
-    return _visit_monte_carlo(MC, policy, max_episodes, first_visit = False)
+def every_visit_monte_carlo(MF, policy, max_episodes):
+    return _visit_monte_carlo(MF, policy, max_episodes, first_visit = False)
 
 
 def _visit_monte_carlo(
@@ -161,12 +161,12 @@ def _visit_monte_carlo(
     return v, q
 
 
-def off_policy_first_visit(MC, policy, max_episodes):
-    return _off_policy_monte_carlo(MC, policy, max_episodes, first_visit=True)
+def off_policy_first_visit(MF, policy, max_episodes):
+    return _off_policy_monte_carlo(MF, policy, max_episodes, first_visit=True)
 
 
-def off_policy_every_visit(MC, policy, max_episodes):
-    return _off_policy_monte_carlo(MC, policy, max_episodes, first_visit=False)
+def off_policy_every_visit(MF, policy, max_episodes):
+    return _off_policy_monte_carlo(MF, policy, max_episodes, first_visit=False)
 
 
 def _off_policy_monte_carlo(
@@ -217,6 +217,8 @@ def _off_policy_monte_carlo(
     return v, q
 
 
+#monte carlo control
+
 def tdn(
     MF,
     policy: Policy = None,
@@ -254,3 +256,6 @@ def tdn(
 
             q_key = (s_t, a_t)
             q[q_key] = q[q_key] + α * (G - q[q_key])
+
+
+# temporal difference control SARSA, QLeearning, and some others
