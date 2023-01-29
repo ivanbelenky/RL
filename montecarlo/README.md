@@ -89,9 +89,9 @@ ES is somewhat not realizable since it may be the case that some state action pa
 - $\color{orange} R(s,a) \leftarrow \emptyset$ 
 - Loop forever 
   - generate episode $\color{orange}S_{0}, A_{0}, R_{1}, \cdots , S_{T-1}, A_{T-1}, R_{T}$ making sure that the first state action pair is selected randomly
-  - loop `episode[::-1]` : `index:T--`
+  - loop `episode[::-1]` : `index:(t=T-1; t>-; t--)`
     - $\color{orange}G\leftarrow \gamma G + R_{t+1}$
-    - if `(s,a)` present not in episode `episode[:T]:
+    - if `(s,a)` present not in episode `episode[:T]`:
       - $\color{orange}R(s,a) \rightarrow  \text{append} (G)$ 
       - $\color{orange}Q(s,a) \rightarrow avg(R(s,a))$
       - $\color{orange}\pi(s) \rightarrow \text{greedy} (Q(s,a))$

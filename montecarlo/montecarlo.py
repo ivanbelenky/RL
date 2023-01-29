@@ -9,7 +9,7 @@ including without limitation the rights to  use, copy, modify, merge, publish,
 distribute, sublicense, and/or sell copies of this.
 '''
 
-from typing import Tuple, Union, NewType
+from typing import List, Tuple, Union, NewType
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -20,9 +20,23 @@ from action import Action
 
 from solvers import (
     first_visit_monte_carlo,
+    every_visit_monte_carlo
 )
 
 EpisodeStep = NewType('EpisodeStep', Tuple[Union[int, State], Union[int, Action], float])
+
+MAX_STEPS = 1E3
+
+
+class MCPolicy(Policy):
+
+    def __call__(self):
+        pass
+
+    def update_policy(self):
+        pass
+
+
 
 class MC(ABC):
     '''
@@ -36,7 +50,8 @@ class MC(ABC):
     '''
 
     VQ_PI_SOLVERS = {
-        'first_visit': first_visit_monte_carlo 
+        'first_visit': first_visit_monte_carlo,
+        'every_visit': every_visit_monte_carlo, 
     }
 
     OPTIMAL_POLICY_SOLVERS = {
@@ -47,7 +62,7 @@ class MC(ABC):
         states: Union[int, State],
         actions: Union[int, Action],
         gamma: float = 0.9,
-        policy: Policy = None,
+        policy: MCPolicy = None,
     ):
     
         self.policy = policy
@@ -67,23 +82,20 @@ class MC(ABC):
             if isinstance(self.action, Action) or isinstance(self.states, State):
                 raise ValueError(
                     'If state is not integer, policy must be defined')
-            
 
-    @property
-    def cum_return(self) -> float:
-        return np.sum([r for _, r in self.episode])
+    def _cast_sa(self, state, action):
+        if isinstance(state, State):
+            state = state.get_index()
+        if isinstance(action, Action):
+            action = action.get_index()
 
-    @property
-    def discounted_return(self) -> float:
-        return np.sum(
-            [r*(self.gamma**i) for i,(_, r) in enumerate(self.history)])
-
+        return state, action
 
     @abstractmethod
     def transition(self, 
         state: Union[int, State], 
         action: Union[int, Action]
-        ) -> Tuple[EpisodeStep, bool]:
+        ) -> Tuple[Tuple[State, float], bool]:
         '''
             The transition method will determine how the world reacts to a
             state action pair 
@@ -91,28 +103,29 @@ class MC(ABC):
 
         raise NotImplementedError
 
-    def _transition(self, state, action):
-        (state, action, reward), end =  self.transition(state, action)
-        
-        if isinstance(state, State):
-            state = state.get_index()
-        if isinstance(action, Action):
-            action = action.get_index()
+    def generate_episode(self,
+        state_0: Union[State, int], 
+        action_0: Union[Action, int],
+        policy: MCPolicy,
+        max_steps: int = MAX_STEPS
+        ) -> List[EpisodeStep]:
 
-        return (state, action, reward), end
+        policy = policy if policy else self.policy
 
-        
-    def generate_episode(self, state_0, action_0):
         episode = []
         end = False
-        while end == False:
-            (s, a, r), end = self._transition(s, a)
-            self.episode.append((s, a, r))
+        step = 0
+        s_t_1, a_t_1 = state_0, action_0
         
+        while (end != True) or (step < max_steps):
+            (s_t, r_t), end = self.transition(s_t_1, a_t_1)
+            _s, _a, _r = self._cast_sa(s_t_1, a_t_1), r_t
+            episode.append((_s, _a, _r))
+
+            a_t = policy(s_t)
+            s_t_1, a_t_1 = s_t, a_t
+            
+            step += 1
+
         return episode
-
     
-
-    def __call__(self, state: int = 0) -> Tuple[int, float]:
-        
-        return a

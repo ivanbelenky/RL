@@ -1,11 +1,11 @@
-from abc import ABC, abstractmethod
+from abc import ABC, abstractclassmethod
 from typing import Any, Union, List
 
 class State(ABC):
-    @abstractmethod
+    @abstractclassmethod
     def get_index(self, state) -> Any:
         raise NotImplementedError
     
-    @abstractmethod
+    @abstractclassmethod
     def from_index(self, action) -> Any:
         raise NotImplementedError
