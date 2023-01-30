@@ -1,5 +1,8 @@
 # Reinforcement Learning
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/YannDubs/disentangling-vae/blob/master/LICENSE) 
+[![Python 3.5+](https://img.shields.io/badge/python-3.5+-blue.svg)](https://www.python.org/downloads/release/python-360/)
+
 <p align="center"> <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTILKI4OYTqNsC6rhZy_RJD0XQlt2WYB3alE3MCD00Vv9X99yiNXKfYFE0Ej8CYxfNwS6g&usqp=CAU">
 </p>
 
