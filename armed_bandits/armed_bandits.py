@@ -14,12 +14,11 @@ from typing import List
 import numpy as np
 import numpy.random as rnd
 
-from policy import Policy
+from utils import Policy, RewardGenerator
 from armed_bandits.policy import EGREEDY
-from reward import GaussianRewardGenerator, RewardGenerator
 
 
-GAUSSIAN = [GaussianRewardGenerator(rnd.random(), rnd.random()) for _ in range(10)]
+GAUSSIAN = [RewardGenerator('normal', rnd.random(), rnd.random()) for _ in range(10)]
 NGAMES = 1
 NSTEPS = 1000
 

@@ -6,11 +6,11 @@ RL - Copyright © 2023 Iván Belenky @Leculette
 import numpy as np
 import numpy.random as rnd
 
-from reward import GaussianRewardGenerator
-from policy import Policy
+from utils import Policy, RewardGenerator
 
 
-GAUSSIAN = [GaussianRewardGenerator(rnd.random(), rnd.random()) for _ in range(10)]
+
+GAUSSIAN = [RewardGenerator('normal', rnd.random(), rnd.random()) for _ in range(10)]
 NGAMES = 1
 NSTEPS = 1000
 

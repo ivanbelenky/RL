@@ -7,7 +7,7 @@ from typing import Tuple
 import numpy as np
 from numpy.linalg import norm as lnorm
 
-from policy import Policy 
+from utils import Policy 
 
 
 MAX_STEPS = 1E3
@@ -128,7 +128,6 @@ def __mc_step(v, q, t, s_t, a_t, s, a, n_s, n_sa, G, first_visit):
     return False
 
 
-
 def _visit_monte_carlo(
     MF,
     policy: Policy = None,
@@ -178,6 +177,21 @@ def off_policy_every_visit(MF, policy, max_episodes):
     return _off_policy_monte_carlo(MF, policy, max_episodes, first_visit=False)
 
 
+def __mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q, first_visit):
+
+    if s_t not in s[:t] or not first_visit:
+        c[s_t] = c[s_t] + w
+        v[s_t] = v[s_t] + w/c[s_t] * (G - v[s_t])
+
+    q_key = (s_t, a_t)
+    if q_key not in zip(s[:t],a[:t]) or not first_visit:
+        c_q[q_key] = c_q[q_key] + w
+        q[q_key] = q[q_key] + w/c_q[q_key] * (G - q[q_key])
+        return True
+
+    return False
+
+
 def _off_policy_monte_carlo(
     MF,
     off_policy: Policy,
@@ -201,33 +215,23 @@ def _off_policy_monte_carlo(
         G = 0
         episode = MF.generate_episode(b, s_0, a_0, max_steps)
         sar = np.array(episode)
-        s, a, r = sar[:,0], sar[:,1], sar[:,2]
+        s, a, _ = sar.T
 
         w = 1
-        for t, (s_t, a_t, r_tt) in enumerate(zip(s[::-1],a[::-1],r[::-1])):
-            if w == 0:
-                break
+        for t, (s_t, a_t, r_tt) in enumerate(sar[::-1]):
+            if w == 0: break
 
             G = γ*G + r_tt
-
-            if s_t not in s[:t] or not first_visit:
-                c[s_t] = c[s_t] + w
-                v[s_t] = v[s_t] + w/c[s_t] * (G - v[s_t])
-
-            q_key = (s_t, a_t)
-            if q_key not in zip(s[:t],a[:t]) or not first_visit:
-                c_q[q_key] = c_q[q_key] + w
-                q[q_key] = q[q_key] + w/c_q[q_key] * (G - q[q_key])
-
+            update = __mc_step_off(q, v, t, s_t, a_t, s, a, 
+                G, w, c, c_q, first_visit)
             w = w * π(a_t, s_t)/b(s_t, a_t)
+
+            if update:
+                π.update_policy(q)
 
         n_episode += 1
     
     return v, q
-
-
-
-
 
 
 

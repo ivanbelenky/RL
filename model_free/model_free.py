@@ -1,12 +1,5 @@
 '''
-RL
-
-Copyright © 2023 Iván Belenky
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files, to deal without restriction, 
-including without limitation the rights to  use, copy, modify, merge, publish, 
-distribute, sublicense, and/or sell copies of this.
+RL - Copyright © 2023 Iván Belenky @Leculette
 '''
 
 from typing import (
@@ -21,10 +14,7 @@ from typing import (
 
 import numpy as np
 
-from policy import Policy
-from state import State
-from action import Action
-
+from utils import Policy, State, Action
 from solvers import (
     first_visit_monte_carlo,
     every_visit_monte_carlo,
@@ -38,7 +28,7 @@ EpisodeStep = NewType(
     'EpisodeStep', Tuple[int, int, float])
 
 
-class BaseModelFreePolicy(Policy):
+class ModelFreePolicy(Policy):
 
     def __init__(self, A, S):
         self.A = A
@@ -53,7 +43,7 @@ class BaseModelFreePolicy(Policy):
         self.pi[s, q_mask] = 1/q_mask.sum()
 
 
-class EpsilonSoftPolicy(BaseModelFreePolicy):
+class EpsilonSoftPolicy(ModelFreePolicy):
     def __init__(self, A, S, eps):
         super.__init__(A, S)
         self.Ɛ = eps
@@ -61,7 +51,6 @@ class EpsilonSoftPolicy(BaseModelFreePolicy):
     def update_policy(self, q, s):
         self.pi[s, :] = self.Ɛ/self.A
         self.pi[s, np.argmax(q)] += 1 - self.Ɛ
-
 
 
 class ModelFree:
@@ -99,14 +88,15 @@ class ModelFree:
         self.action = Action(actions)
         self.transition = transition
         self.gamma = gamma
-        self.policy = policy if policy else ModelFreePolicy()
+        self.policy = policy if policy else ModelFreePolicy(
+            self.action.N, self.state.N)
   
     def random_sa(self):
         s = self.state.random()
         a = self.action.random()
         return s, a
 
-    def _cast_sa(self, state, action):
+    def _to_index(self, state, action):
         if isinstance(state, State):
             state = state.get_index()
         if isinstance(action, Action):
@@ -119,7 +109,7 @@ class ModelFree:
         action: Any,
         ) -> Tuple[Tuple[Any, float], bool]:
         
-        # to help debugging when transitions are ill defined
+        # to help debug ill defined transitions
         try:
             (s, r), end = self.transition(state, action)
 
@@ -156,7 +146,7 @@ class ModelFree:
         
         while (end != True) or (step < max_steps):
             (s_t, r_t), end = self._transition(s_t_1, a_t_1)
-            _s, _a, _r = self._cast_sa(s_t_1, a_t_1), r_t
+            _s, _a, _r = self._to_index(s_t_1, a_t_1), r_t
             episode.append((_s, _a, _r))
 
             a_t = policy(s_t)
