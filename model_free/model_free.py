@@ -38,7 +38,7 @@ EpisodeStep = NewType(
     'EpisodeStep', Tuple[int, int, float])
 
 
-class ModelFreePolicy(Policy):
+class BaseModelFreePolicy(Policy):
 
     def __init__(self, A, S):
         self.A = A
@@ -48,9 +48,21 @@ class ModelFreePolicy(Policy):
     def __call__(self, state: int):
         return np.random.choice(self.A, p=self.pi[state])
 
-    def update_policy(self, q):
-        pass
-        
+    def update_policy(self, q, s):
+        q_mask = q == q[np.max(q)]
+        self.pi[s, q_mask] = 1/q_mask.sum()
+
+
+class EpsilonSoftPolicy(BaseModelFreePolicy):
+    def __init__(self, A, S, eps):
+        super.__init__(A, S)
+        self.Ɛ = eps
+
+    def update_policy(self, q, s):
+        self.pi[s, :] = self.Ɛ/self.A
+        self.pi[s, np.argmax(q)] += 1 - self.Ɛ
+
+
 
 class ModelFree:
     '''

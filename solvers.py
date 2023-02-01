@@ -9,6 +9,7 @@ from numpy.linalg import norm as lnorm
 
 from policy import Policy 
 
+
 MAX_STEPS = 1E3
 MAX_ITER = int(1E4)
 TOL = 1E-6
@@ -112,52 +113,60 @@ def every_visit_monte_carlo(MF, policy, max_episodes):
     return _visit_monte_carlo(MF, policy, max_episodes, first_visit = False)
 
 
+def __mc_step(v, q, t, s_t, a_t, s, a, n_s, n_sa, G, first_visit):
+    
+    if s_t not in s[:t] or not first_visit:
+        n_s[s_t] = n_s[s_t] + 1
+        v[s_t] = v[s_t] + (G - v[s_t])/n_s[s_t]
+    
+    q_key = (s_t, a_t)
+    if q_key not in zip(s[:t],a[:t]) or not first_visit:    
+        n_sa[q_key] = n_sa[q_key] + 1
+        q[q_key] = q[q_key] + (G - q[q_key])/n_sa[q_key]
+        return True
+    
+    return False
+
+
+
 def _visit_monte_carlo(
     MF,
     policy: Policy = None,
     max_episodes: int = MAX_ITER,
     max_steps: int = MAX_STEPS,
     first_visit = True,
-    exploring_starts = False) -> np.ndarray:
+    exploring_starts = False,
+    optimize = False) -> np.ndarray:
     '''
-        Needless to say the inefficiency of the underlying implementation.
-        By no means it was a goal to provide an efficient implementation 
-        time/space wise. The goal was readability.
+        
     '''
-
-    π = policy if policy else MF.policy
-    
-    n_episode = 0
 
     v, q = np.zeros(MF.state.S), np.zeros((MF.action.S, MF.state.A))
     n_s, n_sa = np.zeros(MF.state.S), np.zeros((MF.action.S, MF.state.A))
-
+    π = policy if policy else MF.policy
     γ = MF.gamma
-
     s_0, a_0 = MF.random_sa()
+
+    n_episode = 0
     while n_episode < max_episodes:
         if exploring_starts:
             s_0, a_0 = MF.random_sa()
 
         episode = MF.generate_episode(π, s_0, a_0, max_steps)
-        G = 0
         sar = np.array(episode)
-        s, a, r = sar[:,0], sar[:,1], sar[:,2]
-
-        for t, (s_t, a_t, r_tt) in enumerate(zip(s[::-1],a[::-1],r[::-1])):
+        s, a, _ = sar.T
+        
+        G = 0
+        for t, (s_t, a_t, r_tt) in enumerate(sar[::-1]):
             G = γ*G + r_tt
+            update = __mc_step(v, q, t, s_t, a_t, s, a, n_s,
+                n_sa, G, first_visit)
             
-            if s_t not in s[:t] or not first_visit:
-                n_s[s_t] = n_s[s_t] + 1
-                v[s_t] = v[s_t] + (G - v[s_t])/n_s[s_t]
-            
-            q_key = (s_t, a_t)
-            if q_key not in zip(s[:t],a[:t]) or not first_visit:    
-                n_sa[q_key] = n_sa[q_key] + 1
-                q[q_key] = q[q_key] + (G - q[q_key])/n_sa[q_key]
+            if optimize and update:
+                π.update_policy(q)
 
         n_episode += 1
-
+        
     return v, q
 
 
@@ -217,7 +226,10 @@ def _off_policy_monte_carlo(
     return v, q
 
 
-#monte carlo control
+
+
+
+
 
 def tdn(
     MF,
