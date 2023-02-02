@@ -19,7 +19,7 @@ class Policy(ABC):
 
 class _TabularIndexer():
     '''
-        Simple Proxy for state actions.
+        Simple proxy for tabular state & actions.
     '''
     def __init__(self, seq: Sequence[Any]):
         self.seq = seq

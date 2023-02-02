@@ -29,7 +29,6 @@ EpisodeStep = NewType(
 
 
 class ModelFreePolicy(Policy):
-
     def __init__(self, A, S):
         self.A = A
         self.S = S
@@ -107,7 +106,7 @@ class ModelFree:
     def _transition(self, 
         state: Any, 
         action: Any,
-        ) -> Tuple[Tuple[Any, float], bool]:
+        ) -> Tuple[Tuple[Any, Union[float, int]], bool]:
         
         # to help debug ill defined transitions
         try:
@@ -116,9 +115,11 @@ class ModelFree:
         except Exception as e:
             raise Exception(f"Transition method failed: {e}")    
                     
-        if not isinstance(end, bool) or not isinstance(r, float):
+        if not isinstance(end, bool) or not isinstance(r, (float, int)):
             raise Exception(
-                "Transition method must return (Any, float), bool")
+                "Transition method must return (Any, float), bool"
+                f" instead of ({type(s)}, {type(r)}), {type(end)}"
+                )
         
         try:
             self.state.get_index(s)
@@ -131,9 +132,9 @@ class ModelFree:
         return (s, r), end
 
     def generate_episode(self,
-        policy: ModelFreePolicy,
         state_0: Any, 
         action_0: Any,
+        policy: ModelFreePolicy = None,
         max_steps: int = MAX_STEPS
         ) -> List[EpisodeStep]:
 
@@ -144,13 +145,13 @@ class ModelFree:
         step = 0
         s_t_1, a_t_1 = state_0, action_0
         
-        while (end != True) or (step < max_steps):
+        while (end != True) and (step < max_steps):
             (s_t, r_t), end = self._transition(s_t_1, a_t_1)
-            _s, _a, _r = self._to_index(s_t_1, a_t_1), r_t
+            (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
             episode.append((_s, _a, _r))
 
-            a_t = policy(s_t)
-            s_t_1, a_t_1 = s_t, a_t
+            a_t = policy(self.state.get_index(s_t))
+            s_t_1, a_t_1 = s_t, self.action.from_index(a_t)
             
             step += 1
 
