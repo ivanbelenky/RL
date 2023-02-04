@@ -105,14 +105,14 @@ def value_iteration(
     
 
 
-def first_visit_monte_carlo(MF, policy, max_episodes, max_steps, es):
+def first_visit_monte_carlo(MF, policy, max_episodes, max_steps, es, optimize):
     return _visit_monte_carlo(MF, policy, max_episodes, max_steps,
-    first_visit=True, exploring_starts=es)
+    first_visit=True, exploring_starts=es, optimize=optimize)
 
 
-def every_visit_monte_carlo(MF, policy, max_episodes, max_steps, es):
+def every_visit_monte_carlo(MF, policy, max_episodes, max_steps, es, optimize):
     return _visit_monte_carlo(MF, policy, max_episodes, max_steps, 
-        first_visit = False, exploring_starts=es)
+        first_visit = False, exploring_starts=es, optimize=optimize)
 
 
 def __mc_step(v, q, t, s_t, a_t, s, a, n_s, n_sa, G, first_visit):
@@ -164,19 +164,23 @@ def _visit_monte_carlo(
                 n_sa, G, first_visit)
             
             if optimize and update:
-                π.update_policy(q)
+                π.update_policy(q, s_t)
 
         n_episode += 1
         
     return v, q
 
 
-def off_policy_first_visit(MF, policy, max_episodes):
-    return _off_policy_monte_carlo(MF, policy, max_episodes, first_visit=True)
+def off_policy_first_visit(MF, off_policy, policy, max_episodes, max_steps,
+    optimize):
+    return _off_policy_monte_carlo(MF, off_policy, policy, max_episodes, 
+        max_steps, optimize=optimize, first_visit=True)
 
 
-def off_policy_every_visit(MF, policy, max_episodes):
-    return _off_policy_monte_carlo(MF, policy, max_episodes, first_visit=False)
+def off_policy_every_visit(MF, off_policy, policy, max_episodes, max_steps,
+    optimize):
+    return _off_policy_monte_carlo(MF, off_policy, policy, max_episodes, 
+        max_steps, optimize=optimize, first_visit=False)
 
 
 def __mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q, first_visit):
@@ -213,7 +217,7 @@ def _off_policy_monte_carlo(
     v, q = np.zeros(MF.state.N), np.zeros((MF.state.N, MF.action.N))
     c, c_q = np.zeros(MF.state.N), np.zeros((MF.state.N, MF.action.N))
 
-    s_0, a_0 = MF.random_sa()
+    s_0, a_0 = MF.random_sa(value=True)
     while n_episode < max_episodes:
         G = 0
         episode = MF.generate_episode(s_0, a_0, b, max_steps)
@@ -227,10 +231,10 @@ def _off_policy_monte_carlo(
             G = γ*G + r_tt
             update = __mc_step_off(q, v, t, s_t, a_t, s, a, 
                 G, w, c, c_q, first_visit)
-            w = w * π(a_t, s_t)/b(s_t, a_t)
+            w = w * π.pi_as(a_t, s_t)/b.pi_as(a_t, s_t)
 
             if update and optimize:
-                π.update_policy(q)
+                π.update_policy(q, s_t) 
 
         n_episode += 1
     
@@ -257,7 +261,7 @@ def tdn(
 
     gammatron = np.array([γ**i for i in range(n)])
 
-    s_0, a_0 = MF.random_sa()
+    s_0, a_0 = MF.random_sa(value=True)
     while n_episode < max_episodes:
         episode = MF.generate_episode(s_0, a_0, π, max_steps)
         sar = np.array(episode)

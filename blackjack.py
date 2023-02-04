@@ -1,10 +1,9 @@
 import random
 
-from model_free.model_free import ModelFree
+from model_free.model_free import ModelFree, ModelFreePolicy
 
 VALUES = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 SUITS = ['♠','♥','♦','♣']
-
 CARDS = [(value,suit) for value in VALUES for suit in SUITS]
 
 states = [(i, False, dealer_showing) 
@@ -59,7 +58,6 @@ def black_jack_transition(state, action):
     dealer_sum = count(dealer_cards)
     if action == 'stand':
         dealer_plays = True
-        i=0
         while dealer_plays:
             dealer_sum = count(dealer_cards)
             if dealer_sum < 17:
@@ -94,4 +92,7 @@ black_jack.generate_episode(
     action_0 = action_0  
 )
 
-black_jack.vq_pi()
+b = ModelFreePolicy(actions, states)
+
+black_jack._solve(method='off_policy_first_visit', off_policy=b,
+    exploring_starts=True, optimize=True)

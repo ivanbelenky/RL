@@ -30,7 +30,11 @@ EpisodeStep = NewType(
 
 
 class ModelFreePolicy(Policy):
-    def __init__(self, A, S):
+    def __init__(self, A: Union[Sequence[Any], int], S: Union[Sequence[Any], int]):
+        if not isinstance(A, int):
+            A = len(A)
+        if not isinstance(S, int):
+            S = len(S)
         self.A = A
         self.S = S
         self.pi = np.ones((S, A))/A
@@ -38,11 +42,14 @@ class ModelFreePolicy(Policy):
     def __call__(self, state: int):
         return np.random.choice(self.A, p=self.pi[state])
 
+    def pi_as(self, action: int, state: int):
+        return self.pi[state, action]
+    
     def update_policy(self, q, s):
-        q_mask = q == q[np.max(q)]
-        self.pi[s, q_mask] = 1/q_mask.sum()
-
-
+        qs_mask = q[s] == np.max(q[s])
+        self.pi[s] = np.where(qs_mask, 1/qs_mask.sum(), 0)
+        
+        
 class EpsilonSoftPolicy(ModelFreePolicy):
     def __init__(self, A, S, eps):
         super.__init__(A, S)
@@ -63,8 +70,8 @@ class ModelFree:
     '''
 
     VQ_PI_SOLVERS = {
-        'first_visit': first_visit_monte_carlo,
-        'every_visit': every_visit_monte_carlo, 
+        'first_visit_mc': first_visit_monte_carlo,
+        'every_visit_mc': every_visit_monte_carlo, 
         'off_policy_first_visit': off_policy_first_visit,
         'off_policy_first_visit': off_policy_every_visit,
         'temporal_difference': tdn,
@@ -130,10 +137,10 @@ class ModelFree:
 
         return (s, r), end
 
-    def vq_pi(self, method: str = 'first_visit', policy: ModelFreePolicy = None,  
-        off_policy: ModelFreePolicy = None, max_episodes=MAX_ITER, 
-        max_steps=MAX_STEPS, exploring_starts=True) -> Tuple[np.ndarray, np.ndarray]:
-        
+    def _solve(self, method: str = 'first_visit_mc', policy: ModelFreePolicy = None, 
+        off_policy: ModelFreePolicy = None, max_episodes: int = MAX_ITER, 
+        optimize: bool=False, max_steps: int=MAX_STEPS, exploring_starts=True
+        ) -> Tuple[np.ndarray, np.ndarray]:
         '''
         Individual state value functions and action-value functions
         vpi and qpi cannot be calculated for bigger problems. That
@@ -143,10 +150,18 @@ class ModelFree:
         solver = self.VQ_PI_SOLVERS.get(method)
         if not solver:
             raise ValueError(f"Method {method} does not exist")
+        if not isinstance(policy, ModelFreePolicy):
+            raise ValueError(f"Policy must be a ModelFreePolicy")
 
         if 'off_policy' in method:
-            return solver(self, off_policy, policy, max_episodes, max_steps)
-        return solver(self, policy, max_episodes, max_steps, exploring_starts)
+            if not off_policy or not isinstance(off_policy, ModelFreePolicy):
+                raise ValueError(
+                    "Off policy method requires a behavior policy"
+                    f"not {type(off_policy)}")
+            return solver(self, off_policy, policy, max_episodes, max_steps,
+                optimize=optimize)
+        return solver(self, policy, max_episodes, max_steps, exploring_starts,
+            optimize=optimize)
 
     def generate_episode(self,
         state_0: Any, 
