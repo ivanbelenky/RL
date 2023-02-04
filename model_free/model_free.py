@@ -21,7 +21,8 @@ from solvers import (
     off_policy_first_visit,
     off_policy_every_visit,
     tdn,
-    MAX_STEPS
+    MAX_STEPS,
+    MAX_ITER
 )
 
 EpisodeStep = NewType(
@@ -54,12 +55,11 @@ class EpsilonSoftPolicy(ModelFreePolicy):
 
 class ModelFree:
     '''
-        MC is an abstract class that is able to handle arbitrary
-        word transition models. 
-        
-        The interface defines just one necessary implementation
-        transition. 
-
+    MC is an abstract class that is able to handle arbitrary
+    word transition models. 
+    
+    The interface defines just one necessary implementation
+    transition. 
     '''
 
     VQ_PI_SOLVERS = {
@@ -90,16 +90,16 @@ class ModelFree:
         self.policy = policy if policy else ModelFreePolicy(
             self.action.N, self.state.N)
   
-    def random_sa(self):
-        s = self.state.random()
-        a = self.action.random()
+    def random_sa(self, value=False):
+        s = self.state.random(value)
+        a = self.action.random(value)
         return s, a
 
     def _to_index(self, state, action):
-        if isinstance(state, State):
-            state = state.get_index()
-        if isinstance(action, Action):
-            action = action.get_index()
+        if not isinstance(state, int):
+            state = self.state.get_index(state)
+        if not isinstance(action, int):
+            action = self.action.get_index(action)
 
         return state, action
 
@@ -111,7 +111,6 @@ class ModelFree:
         # to help debug ill defined transitions
         try:
             (s, r), end = self.transition(state, action)
-
         except Exception as e:
             raise Exception(f"Transition method failed: {e}")    
                     
@@ -130,6 +129,24 @@ class ModelFree:
                 f"Undeclared state or action in transition method: {e}")
 
         return (s, r), end
+
+    def vq_pi(self, method: str = 'first_visit', policy: ModelFreePolicy = None,  
+        off_policy: ModelFreePolicy = None, max_episodes=MAX_ITER, 
+        max_steps=MAX_STEPS, exploring_starts=True) -> Tuple[np.ndarray, np.ndarray]:
+        
+        '''
+        Individual state value functions and action-value functions
+        vpi and qpi cannot be calculated for bigger problems. That
+        constraint will give rise to parametrizations via DL.
+        '''
+        policy = policy if policy else self.policy
+        solver = self.VQ_PI_SOLVERS.get(method)
+        if not solver:
+            raise ValueError(f"Method {method} does not exist")
+
+        if 'off_policy' in method:
+            return solver(self, off_policy, policy, max_episodes, max_steps)
+        return solver(self, policy, max_episodes, max_steps, exploring_starts)
 
     def generate_episode(self,
         state_0: Any, 

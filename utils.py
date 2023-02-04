@@ -34,9 +34,11 @@ class _TabularIndexer():
             if i == idx:
                 return k
 
-    def random(self):
-        return np.random.choice(self.states)
-
+    def random(self, value=False):
+        rnd_idx = np.random.choice(self.N)
+        if value:
+            return self.seq[rnd_idx]
+        return rnd_idx
 
 class State(_TabularIndexer):
     pass
