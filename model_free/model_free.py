@@ -49,10 +49,10 @@ class ModelFreePolicy(Policy):
         qs_mask = q[s] == np.max(q[s])
         self.pi[s] = np.where(qs_mask, 1/qs_mask.sum(), 0)
         
-        
+
 class EpsilonSoftPolicy(ModelFreePolicy):
     def __init__(self, A, S, eps):
-        super.__init__(A, S)
+        super().__init__(A, S)
         self.Ɛ = eps
 
     def update_policy(self, q, s):
@@ -69,15 +69,12 @@ class ModelFree:
     transition. 
     '''
 
-    VQ_PI_SOLVERS = {
+    SOLVERS = {
         'first_visit_mc': first_visit_monte_carlo,
         'every_visit_mc': every_visit_monte_carlo, 
         'off_policy_first_visit': off_policy_first_visit,
-        'off_policy_first_visit': off_policy_every_visit,
+        'off_policy_every_visit': off_policy_every_visit,
         'temporal_difference': tdn,
-    }
-
-    OPTIMAL_POLICY_SOLVERS = {
     }
     
     def __init__(
@@ -85,7 +82,7 @@ class ModelFree:
         states: Sequence[Any],
         actions: Sequence[Any],
         transition: Callable,
-        gamma: float = 0.9,
+        gamma: float = 1,
         policy: ModelFreePolicy = None,
     ):
     
@@ -139,15 +136,15 @@ class ModelFree:
 
     def _solve(self, method: str = 'first_visit_mc', policy: ModelFreePolicy = None, 
         off_policy: ModelFreePolicy = None, max_episodes: int = MAX_ITER, 
-        optimize: bool=False, max_steps: int=MAX_STEPS, exploring_starts=True
-        ) -> Tuple[np.ndarray, np.ndarray]:
+        optimize: bool=False, max_steps: int=MAX_STEPS, exploring_starts=True,
+        ordinary: bool=False) -> Tuple[np.ndarray, np.ndarray]:
         '''
         Individual state value functions and action-value functions
         vpi and qpi cannot be calculated for bigger problems. That
         constraint will give rise to parametrizations via DL.
         '''
         policy = policy if policy else self.policy
-        solver = self.VQ_PI_SOLVERS.get(method)
+        solver = self.SOLVERS.get(method)
         if not solver:
             raise ValueError(f"Method {method} does not exist")
         if not isinstance(policy, ModelFreePolicy):
@@ -159,7 +156,7 @@ class ModelFree:
                     "Off policy method requires a behavior policy"
                     f"not {type(off_policy)}")
             return solver(self, off_policy, policy, max_episodes, max_steps,
-                optimize=optimize)
+                ordinary=ordinary, optimize=optimize)
         return solver(self, policy, max_episodes, max_steps, exploring_starts,
             optimize=optimize)
 
@@ -176,12 +173,10 @@ class ModelFree:
         end = False
         step = 0
         s_t_1, a_t_1 = state_0, action_0
-        
         while (end != True) and (step < max_steps):
             (s_t, r_t), end = self._transition(s_t_1, a_t_1)
             (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
             episode.append((_s, _a, _r))
-
             a_t = policy(self.state.get_index(s_t))
             s_t_1, a_t_1 = s_t, self.action.from_index(a_t)
             

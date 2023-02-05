@@ -1,17 +1,15 @@
 import random
 
-from model_free.model_free import ModelFree, ModelFreePolicy
-
 VALUES = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 SUITS = ['♠','♥','♦','♣']
 CARDS = [(value,suit) for value in VALUES for suit in SUITS]
 
 states = [(i, False, dealer_showing) 
-    for i in range(4,22) 
+    for i in range(4,21) 
     for dealer_showing in VALUES]
 
 states += [(i, True, dealer_showing) 
-    for i in range(12,22)
+    for i in range(12,21)
     for dealer_showing in VALUES]
 
 actions = ['hit', 'stand']
@@ -34,7 +32,8 @@ def count(cards):
 
 def black_jack_transition(state, action):
     player_sum, usable_ace, dealer_showing = state
-    if action == 'hit':
+    
+    if action == 'hit' and player_sum < 21:
         new_card = random.choice(VALUES)
         if new_card == 'A':
             if player_sum + 11 > 21:
@@ -48,12 +47,19 @@ def black_jack_transition(state, action):
             card_value = int(new_card)
 
         player_sum += card_value
+        if usable_ace and player_sum > 21:
+            player_sum -= 10
+            usable_ace = False
+
         if player_sum > 21:
-            return (state, -1), True
+            return (state, -1.), True
+        elif player_sum == 21:
+            pass
         else:
             new_state = (player_sum, usable_ace, dealer_showing)
-            return (new_state, 0), False
+            return (new_state, 0.), False
     
+
     dealer_cards = [dealer_showing]
     dealer_sum = count(dealer_cards)
     if action == 'stand':
@@ -64,35 +70,13 @@ def black_jack_transition(state, action):
                 dealer_cards.append(random.choice(VALUES))
                 continue
             elif dealer_sum > 21:
-                return (state, 1), True
+                return (state, 1.), True
             elif 17 <= dealer_sum < 22:
                 dealer_plays = False
     
     if dealer_sum > player_sum:
-        return (state, -1), True
+        return (state, -1.), True
     elif dealer_sum < player_sum:
-        return (state, 1), True
+        return (state, 1.), True
     elif dealer_sum == player_sum:
-        return (state, 0), True
-
-
-black_jack = ModelFree(
-    states=states,
-    actions=actions,
-    gamma=0.9,
-    transition=black_jack_transition    
-)
-
-state_0 = random.choice(states)
-action_0 = random.choice(actions)
-
-
-black_jack.generate_episode(
-    state_0 = state_0,
-    action_0 = action_0  
-)
-
-b = ModelFreePolicy(actions, states)
-
-black_jack._solve(method='off_policy_first_visit', off_policy=b,
-    exploring_starts=True, optimize=True)
+        return (state, 0.), True

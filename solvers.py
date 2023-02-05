@@ -116,13 +116,12 @@ def every_visit_monte_carlo(MF, policy, max_episodes, max_steps, es, optimize):
 
 
 def __mc_step(v, q, t, s_t, a_t, s, a, n_s, n_sa, G, first_visit):
-    
-    if s_t not in s[:t] or not first_visit:
+    if s_t not in s[:-(t+1)] or not first_visit:
         n_s[s_t] = n_s[s_t] + 1
         v[s_t] = v[s_t] + (G - v[s_t])/n_s[s_t]
     
     q_key = (s_t, a_t)
-    if q_key not in zip(s[:t],a[:t]) or not first_visit:    
+    if q_key not in zip(s[:-(t+1)],a[:-(t+1)]) or not first_visit:    
         n_sa[q_key] = n_sa[q_key] + 1
         q[q_key] = q[q_key] + (G - q[q_key])/n_sa[q_key]
         return True
@@ -141,7 +140,6 @@ def _visit_monte_carlo(
     '''
         
     '''
-
     v, q = np.zeros(MF.state.N), np.zeros((MF.state.N, MF.action.N))
     n_s, n_sa = np.zeros(MF.state.N), np.zeros((MF.state.N, MF.action.N))
     π = policy if policy else MF.policy
@@ -157,8 +155,9 @@ def _visit_monte_carlo(
         sar = np.array(episode)
         s, a, _ = sar.T
         
-        G = 0
+        G = 0   
         for t, (s_t, a_t, r_tt) in enumerate(sar[::-1]):
+            s_t, a_t = int(s_t), int(a_t)
             G = γ*G + r_tt
             update = __mc_step(v, q, t, s_t, a_t, s, a, n_s,
                 n_sa, G, first_visit)
@@ -172,27 +171,31 @@ def _visit_monte_carlo(
 
 
 def off_policy_first_visit(MF, off_policy, policy, max_episodes, max_steps,
-    optimize):
+    ordinary, optimize):
     return _off_policy_monte_carlo(MF, off_policy, policy, max_episodes, 
-        max_steps, optimize=optimize, first_visit=True)
+        max_steps, optimize=optimize, ordinary=ordinary, first_visit=True)
 
 
 def off_policy_every_visit(MF, off_policy, policy, max_episodes, max_steps,
-    optimize):
+    ordinary, optimize):
     return _off_policy_monte_carlo(MF, off_policy, policy, max_episodes, 
-        max_steps, optimize=optimize, first_visit=False)
+        max_steps, optimize=optimize, ordinary=ordinary, first_visit=False)
 
 
-def __mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q, first_visit):
+def __mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q, 
+    first_visit, ordinary):
+    
+    c_add = 1 if ordinary else w
+    denom = w if ordinary else 1    
 
-    if s_t not in s[:t] or not first_visit:
-        c[s_t] = c[s_t] + w
-        v[s_t] = v[s_t] + w/c[s_t] * (G - v[s_t])
+    if s_t not in s[:-(t+1)] or not first_visit:
+        c[s_t] = c[s_t] + c_add
+        v[s_t] = v[s_t] + w/c[s_t] * (G - v[s_t]/denom)
 
     q_key = (s_t, a_t)
-    if q_key not in zip(s[:t],a[:t]) or not first_visit:
-        c_q[q_key] = c_q[q_key] + w
-        q[q_key] = q[q_key] + w/c_q[q_key] * (G - q[q_key])
+    if q_key not in zip(s[:-(t+1)],a[:-(t+1)]) or not first_visit:
+        c_q[q_key] = c_q[q_key] + c_add
+        q[q_key] = q[q_key] + w/c_q[q_key] * (G - q[q_key]/denom)
         return True
 
     return False
@@ -205,6 +208,7 @@ def _off_policy_monte_carlo(
     max_episodes: int = MAX_ITER,
     max_steps: int = MAX_STEPS,
     first_visit = True,
+    ordinary = False,
     optimize = False
     ) -> Tuple[np.ndarray, np.ndarray]:
 
@@ -217,22 +221,26 @@ def _off_policy_monte_carlo(
     v, q = np.zeros(MF.state.N), np.zeros((MF.state.N, MF.action.N))
     c, c_q = np.zeros(MF.state.N), np.zeros((MF.state.N, MF.action.N))
 
-    s_0, a_0 = MF.random_sa(value=True)
     while n_episode < max_episodes:
         G = 0
+        s_0, a_0 = MF.random_sa(value=True)
         episode = MF.generate_episode(s_0, a_0, b, max_steps)
         sar = np.array(episode)
         s, a, _ = sar.T
 
         w = 1
         for t, (s_t, a_t, r_tt) in enumerate(sar[::-1]):
-            if w == 0: break
+            s_t, a_t = int(s_t), int(a_t)
+            rho = π.pi_as(a_t, s_t)/b.pi_as(a_t, s_t)
+            if rho == 0: break
 
             G = γ*G + r_tt
+            
             update = __mc_step_off(q, v, t, s_t, a_t, s, a, 
-                G, w, c, c_q, first_visit)
-            w = w * π.pi_as(a_t, s_t)/b.pi_as(a_t, s_t)
-
+                G, w, c, c_q, first_visit, ordinary)
+            
+            w = w*rho 
+            
             if update and optimize:
                 π.update_policy(q, s_t) 
 
