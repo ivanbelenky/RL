@@ -16,6 +16,7 @@ import numpy as np
 MAX_STEPS = 1E3
 MAX_ITER = int(1E4)
 TOL = 1E-6
+MEAN_ITERS = int(1E4)
 
 
 class Policy(ABC):
@@ -29,18 +30,6 @@ class Policy(ABC):
     @abstractmethod
     def update_policy(self, *args, **kwargs):
         raise NotImplementedError
-
-
-class Vpi:
-    pass
-
-class Qpi:
-    pass
-
-
-VQPi = NewType('VQPi', Tuple[Vpi, Qpi, Policy])
-Samples = NewType('Samples', Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]])
-Transition = Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
 
 
 class _TabularIndexer():
@@ -75,7 +64,26 @@ class Action(_TabularIndexer):
     pass
 
 
-MEAN_ITERS = int(1E4)
+class _TabularValues:
+    def __init__(self, values: np.ndarray, idx: _TabularIndexer):
+        self.v = values
+        self.idx = idx
+        self.idx_val = {k:v for k,v in zip(idx.index.keys(), values)}
+
+    def values(self):
+        return self.idx_val
+
+
+class Vpi(_TabularValues):
+    pass    
+
+class Qpi(_TabularValues):
+    pass
+
+
+VQPi = NewType('VQPi', Tuple[Vpi, Qpi, Policy])
+Samples = NewType('Samples', Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]])
+Transition = Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
 
 
 class RewardGenerator():

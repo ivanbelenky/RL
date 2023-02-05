@@ -1,15 +1,11 @@
 """
 RL - Copyright © 2023 Iván Belenky @Leculette
 """
-
 from typing import (
     Tuple, 
-    Sequence, 
-    Callable,
-    Dict,
-    List, 
-    Any, 
-    NewType)
+    Sequence,  
+    Any
+)
 
 import numpy as np
 from numpy.linalg import norm as lnorm
@@ -17,7 +13,8 @@ from numpy.linalg import norm as lnorm
 from model_free import (
     ModelFree,
     ModelFreePolicy,
-    EpsilonSoftPolicy)
+    EpsilonSoftPolicy
+)
 from utils import (
     Policy,
     _typecheck_all,
@@ -28,11 +25,14 @@ from utils import (
     Vpi,
     Qpi,
     MAX_ITER,
-    MAX_STEPS) 
+    MAX_STEPS,
+    TOL
+) 
 
 
-def get_sample(v, q, π, n_episode, optimize):
-    _idx, _v, _q = n_episode, Vpi(v.copy()), Qpi(q.copy())
+def get_sample(MF, v, q, π, n_episode, optimize):
+    _idx = n_episode
+    _v, _q = Vpi(v.copy(), MF.states), Qpi(q.copy(), MF.actions)
     _pi = None
     if optimize:
         _pi = π.pi.copy() 
@@ -153,13 +153,9 @@ def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, sample_step):
         n_episode += 1
 
         if sample_step and n_episode % sample_step == 0:
-            samples.append(get_sample(v, q, π, n_episode))
+            samples.append(get_sample(MF, v, q, π, n_episode))
     
     return v, q, samples
-
-
-
-
 
 
 def vq_π_iter_naive(
