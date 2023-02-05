@@ -143,12 +143,12 @@ def _typecheck_policies(*args):
                 f"Policies must be Policy, not {type(arg)}")
 
 
-def _typecheck_all(tabular_idxs=None, callables=None, constants=None,
+def _typecheck_all(tabular_idxs=None, transition=None, constants=None,
     booleans=None, policies=None):
     if tabular_idxs:
         _typecheck_tabular_idxs(*tabular_idxs)
-    if callables:
-        _typecheck_transition(*callables)
+    if transition:
+        _typecheck_transition(transition)
     if constants:
         _typecheck_constants(*constants)
     if booleans:
@@ -164,3 +164,8 @@ def _get_sample_step(samples, n_episodes):
         samples = int(1E3)
     sample_step = int(n_episodes / samples)
     return sample_step
+
+def _check_ranges(values, ranges):
+    for v, r in zip(values, ranges):
+        if v < r[0] or v > r[1]:
+            raise ValueError(f"{v} is out of range {r}")
