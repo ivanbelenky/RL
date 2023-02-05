@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import (
     Any, 
-    Union, 
     Sequence, 
     List, 
-    Dict,
     Tuple,
     Callable,
     NewType
@@ -17,7 +15,6 @@ MAX_STEPS = 1E3
 MAX_ITER = int(1E4)
 TOL = 1E-6
 MEAN_ITERS = int(1E4)
-
 
 class Policy(ABC):
     def __init__(self):
@@ -80,6 +77,7 @@ class Vpi(_TabularValues):
 class Qpi(_TabularValues):
     pass
 
+    
 
 VQPi = NewType('VQPi', Tuple[Vpi, Qpi, Policy])
 Samples = NewType('Samples', Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]])

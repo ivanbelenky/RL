@@ -547,5 +547,3 @@ def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, sample_step):
 
 
 # temporal difference control SARSA, QLeearning, and some others
-
-

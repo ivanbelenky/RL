@@ -71,14 +71,6 @@ class ModelFree:
     transition. 
     '''
 
-    SOLVERS = {
-        'first_visit_mc': first_visit_monte_carlo,
-        'every_visit_mc': every_visit_monte_carlo, 
-        'off_policy_first_visit': off_policy_first_visit,
-        'off_policy_every_visit': off_policy_every_visit,
-        'temporal_difference': tdn,
-    }
-    
     def __init__(
         self,
         states: Sequence[Any],
