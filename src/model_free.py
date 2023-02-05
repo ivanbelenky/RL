@@ -14,19 +14,21 @@ from typing import (
 
 import numpy as np
 
-from utils import Policy, State, Action
+from utils import Policy, State, Action, MAX_ITER, MAX_STEPS
 from solvers import (
     first_visit_monte_carlo,
     every_visit_monte_carlo,
     off_policy_first_visit,
     off_policy_every_visit,
-    tdn,
-    MAX_STEPS,
-    MAX_ITER
+    tdn
 )
 
 EpisodeStep = NewType(
     'EpisodeStep', Tuple[int, int, float])
+
+
+class TransitionException(Exception):
+    pass
 
 
 class ModelFreePolicy(Policy):
@@ -87,23 +89,28 @@ class ModelFree:
     ):
     
         self.policy = policy
-        self.state = State(states)
-        self.action = Action(actions)
+        self.states = State(states)
+        self.actions = Action(actions)
         self.transition = transition
         self.gamma = gamma
         self.policy = policy if policy else ModelFreePolicy(
-            self.action.N, self.state.N)
+            self.actions.N, self.states.N)
   
+    def init_vq(self):
+        v = np.zeros(self.states.N) 
+        q = np.zeros((self.states.N, self.actions.N))
+        return v,q 
+
     def random_sa(self, value=False):
-        s = self.state.random(value)
-        a = self.action.random(value)
+        s = self.states.random(value)
+        a = self.actions.random(value)
         return s, a
 
     def _to_index(self, state, action):
         if not isinstance(state, int):
-            state = self.state.get_index(state)
+            state = self.states.get_index(state)
         if not isinstance(action, int):
-            action = self.action.get_index(action)
+            action = self.actions.get_index(action)
 
         return state, action
 
@@ -116,49 +123,22 @@ class ModelFree:
         try:
             (s, r), end = self.transition(state, action)
         except Exception as e:
-            raise Exception(f"Transition method failed: {e}")    
+            raise TransitionException(f"Transition method failed: {e}")    
                     
         if not isinstance(end, bool) or not isinstance(r, (float, int)):
-            raise Exception(
+            raise TransitionException(
                 "Transition method must return (Any, float), bool"
                 f" instead of ({type(s)}, {type(r)}), {type(end)}"
-                )
-        
+                )  
         try:
-            self.state.get_index(s)
-            self.state.get_index(state)
-            self.action.get_index(action)
+            self.states.get_index(s)
+            self.states.get_index(state)
+            self.actions.get_index(action)
         except Exception as e:
-            raise Exception(
+            raise TransitionException(
                 f"Undeclared state or action in transition method: {e}")
 
         return (s, r), end
-
-    def _solve(self, method: str = 'first_visit_mc', policy: ModelFreePolicy = None, 
-        off_policy: ModelFreePolicy = None, max_episodes: int = MAX_ITER, 
-        optimize: bool=False, max_steps: int=MAX_STEPS, exploring_starts=True,
-        ordinary: bool=False) -> Tuple[np.ndarray, np.ndarray]:
-        '''
-        Individual state value functions and action-value functions
-        vpi and qpi cannot be calculated for bigger problems. That
-        constraint will give rise to parametrizations via DL.
-        '''
-        policy = policy if policy else self.policy
-        solver = self.SOLVERS.get(method)
-        if not solver:
-            raise ValueError(f"Method {method} does not exist")
-        if not isinstance(policy, ModelFreePolicy):
-            raise ValueError(f"Policy must be a ModelFreePolicy")
-
-        if 'off_policy' in method:
-            if not off_policy or not isinstance(off_policy, ModelFreePolicy):
-                raise ValueError(
-                    "Off policy method requires a behavior policy"
-                    f"not {type(off_policy)}")
-            return solver(self, off_policy, policy, max_episodes, max_steps,
-                ordinary=ordinary, optimize=optimize)
-        return solver(self, policy, max_episodes, max_steps, exploring_starts,
-            optimize=optimize)
 
     def generate_episode(self,
         state_0: Any, 
@@ -177,8 +157,8 @@ class ModelFree:
             (s_t, r_t), end = self._transition(s_t_1, a_t_1)
             (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
             episode.append((_s, _a, _r))
-            a_t = policy(self.state.get_index(s_t))
-            s_t_1, a_t_1 = s_t, self.action.from_index(a_t)
+            a_t = policy(self.states.get_index(s_t))
+            s_t_1, a_t_1 = s_t, self.actions.from_index(a_t)
             
             step += 1
 

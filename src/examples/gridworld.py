@@ -5,7 +5,7 @@ import sys
 
 import numpy as np
 
-from mdp.mdp import MDP, TabularReward
+from src.mdp import MDP, TabularReward
 
 GRID_SIZE = 5 # 5x5 gridworld
 
