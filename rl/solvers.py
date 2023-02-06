@@ -356,12 +356,20 @@ def _mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q,
 
     if s_t not in s[:-(t+1)] or not first_visit:
         c[s_t] = c[s_t] + c_add
-        v[s_t] = v[s_t] + w/c[s_t] * (G - v[s_t]/denom)
-
+        if w < 1E-10:
+            if ordinary:
+                v[s_t] = v[s_t] - 1/c[s_t] * v[s_t]
+        else:
+            v[s_t] = v[s_t] + w/c[s_t] * (G - v[s_t]/denom)
+        
     q_key = (s_t, a_t)
     if q_key not in zip(s[:-(t+1)],a[:-(t+1)]) or not first_visit:
         c_q[q_key] = c_q[q_key] + c_add
-        q[q_key] = q[q_key] + w/c_q[q_key] * (G - q[q_key]/denom)
+        if w < 1E-10:
+            if ordinary:
+                q[q_key] = q[q_key] - 1/c_q[q_key] * q[q_key]
+        else:
+            q[q_key] = q[q_key] + w/c_q[q_key] * (G - q[q_key]/denom)
         return True
 
     return False
@@ -382,28 +390,29 @@ def _off_policy_monte_carlo(MF, off_policy, n_episodes, max_steps, first_visit,
     c, c_q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
 
     while n_episode < n_episodes:
-        G = 0
+        G = 0.
         s_0, a_0 = MF.random_sa(value=True)
         episode = MF.generate_episode(s_0, a_0, b, max_steps)
         sar = np.array(episode)
         s, a, _ = sar.T
 
-        w = 1
+        w = 1.
         for t, (s_t, a_t, r_tt) in enumerate(sar[::-1]):
-            s_t, a_t = int(s_t), int(a_t)
-            rho = π.pi_as(a_t, s_t)/b.pi_as(a_t, s_t)
-            if rho == 0: break
+            if w < 1E-10:
+                break
 
-            G = γ*G + r_tt
+            s_t, a_t = int(s_t), int(a_t)
             
+            rho = π.pi_as(a_t, s_t)/b.pi_as(a_t, s_t)
+            w = w*rho 
+            
+            G = γ*G + r_tt
             update = _mc_step_off(q, v, t, s_t, a_t, s, a, 
                 G, w, c, c_q, first_visit, ordinary)
             
-            w = w*rho 
-            
             if update and optimize:
                 π.update_policy(q, s_t) 
-
+        
         n_episode += 1
 
         if sample_step and n_episode % sample_step == 0:
