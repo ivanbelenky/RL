@@ -14,7 +14,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from utils import (
+from rl.utils import (
     State,
     Action,
     Policy,
@@ -143,7 +143,7 @@ class MarkovPolicy(Policy):
 
     def __call__(self, state: int) -> np.ndarray:
         '''
-        collapses the policy to a single action, i.e. a sample from the
+        Collapses the policy to a single action, i.e. a sample from the
         random variable that represents the policy.
         '''
         return np.random.choice(self.pi_sa[state], p=self.pi_sa[state])
@@ -220,9 +220,9 @@ class MDP:
         method: str = 'iter_n'
         ) -> np.ndarray:
         '''
-            Individual state value functions and action-value functions
-            vpi and qpi cannot be calculated for bigger problems. That
-            constraint will give rise to parametrizations via DL.
+        Individual state value functions and action-value functions
+        vpi and qpi cannot be calculated for bigger problems. That
+        constraint will give rise to parametrizations via DL.
         '''
         policy = policy if policy else self.policy
         solver = self.VQ_PI_SOLVERS.get(method)
@@ -237,9 +237,9 @@ class MDP:
         policy: MarkovPolicy = None
         ) -> MarkovPolicy:
         '''
-            Optimal policy is the policy that maximizes the expected
-            discounted return. It is the policy that maximizes the
-            value function for each possible state.
+        Optimal policy is the policy that maximizes the expected
+        discounted return. It is the policy that maximizes the
+        value function for each possible state.
         '''
         policy = policy if policy else self.policy
         solver = self.OPTIMAL_POLICY_SOLVERS.get(method)

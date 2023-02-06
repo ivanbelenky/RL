@@ -16,6 +16,7 @@ MAX_ITER = int(1E4)
 TOL = 1E-6
 MEAN_ITERS = int(1E4)
 
+
 class Policy(ABC):
     def __init__(self):
         pass
@@ -61,6 +62,10 @@ class Action(_TabularIndexer):
     pass
 
 
+class StateAction(_TabularIndexer):
+    pass
+
+
 class _TabularValues:
     def __init__(self, values: np.ndarray, idx: _TabularIndexer):
         self.v = values
@@ -68,14 +73,16 @@ class _TabularValues:
         self.idx_val = {k:v for k,v in zip(idx.index.keys(), values)}
 
     def values(self):
-        return self.idx_val
+        return self.v
 
 
 class Vpi(_TabularValues):
-    pass    
+    def __str__(self):
+        return f'Vpi({self.v[:10]}...)'
 
 class Qpi(_TabularValues):
-    pass
+    def __str__(self):
+        return f'Vpi({self.v[:10]}...)'
 
     
 
@@ -114,13 +121,13 @@ def _typecheck_transition(transition):
     if not isinstance(transition, Callable):
         raise TypeError(
             f"transition must be a Callable, not {type(transition)}")
-    
-    if len(transition.__code__.co_varnames) != 2:
-        raise TypeError(
-            "transition must have 2 arguments, not ",
-            len(transition.__code__.co_varnames))
-    
 
+    #check that transition function has just two positional arguments
+    if transition.__code__.co_argcount != 2:
+        raise TypeError(
+            f"transition must have two positional arguments,"
+            f" not {transition.__code__.co_argcount}")   
+ 
 def _typecheck_constants(*args):
     for arg in args:
         if not isinstance(arg, (float, int)):

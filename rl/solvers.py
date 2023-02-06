@@ -10,12 +10,12 @@ from typing import (
 import numpy as np
 from numpy.linalg import norm as lnorm
 
-from model_free import (
+from rl.model_free import (
     ModelFree,
     ModelFreePolicy,
     EpsilonSoftPolicy
 )
-from utils import (
+from rl.utils import (
     Policy,
     _typecheck_all,
     _get_sample_step,
@@ -31,8 +31,9 @@ from utils import (
 ) 
 
 
-def get_sample(v, q, π, n_episode, optimize):
-    _idx, _v, _q = n_episode, Vpi(v.copy()), Qpi(q.copy())
+def get_sample(MF, v, q, π, n_episode, optimize):
+    _idx = n_episode
+    _v, _q = Vpi(v.copy(), MF.states), Qpi(q.copy(), MF.stateaction)
     _pi = None
     if optimize:
         _pi = π.pi.copy() 
@@ -118,10 +119,9 @@ def value_iteration(MDP, policy: Policy = None, tol: float = TOL,
     policy.update_policy(qᵢ)
 
 
-
 def alpha_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     gamma: float=0.9, alpha: float=0.05, use_N :bool=False, first_visit: bool=True,
-    exploring_starts: bool=False, n_episodes: int=MAX_ITER, max_steps: int=MAX_STEPS,
+    exploring_starts: bool=True, n_episodes: int=MAX_ITER, max_steps: int=MAX_STEPS,
     samples: int=1000, optimize: bool=False, policy: ModelFreePolicy=None, 
     eps: float=None) -> Tuple[VQPi, Samples]:
     '''α-MC state and action-value function estimation, policy optimization
@@ -176,9 +176,9 @@ def alpha_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transiti
     '''
     if not policy and eps:
         _check_ranges(values=[eps], ranges=[(0,1)])
-        policy = EpsilonSoftPolicy(states, actions, eps=eps)
+        policy = EpsilonSoftPolicy(actions, states, eps=eps)
     elif not policy:
-        policy = ModelFreePolicy(states, actions)
+        policy = ModelFreePolicy(actions, states)
 
     _typecheck_all(tabular_idxs=[states, actions],transition=transition,
         constants=[gamma, alpha, n_episodes, max_steps, samples],
@@ -264,16 +264,16 @@ def _visit_monte_carlo(MF, first_visit, exploring_starts, use_N, alpha,
         n_episode += 1
 
         if sample_step and n_episode % sample_step == 0:
-            samples.append(get_sample(MF, v, q, π, n_episode))
-        
-    return v, q
+            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+
+    return v, q, samples
 
 
 def off_policy_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     gamma: float=0.9, first_visit: bool=True, ordinary: bool=True,  
     n_episodes: int=MAX_ITER, max_steps: int=MAX_STEPS, samples: int=1000, 
     optimize: bool=False, policy: ModelFreePolicy=None, eps: float=None, 
-    b :ModelFreePolicy=None) -> Tuple[VQPi, Samples]: 
+    b: ModelFreePolicy=None) -> Tuple[VQPi, Samples]: 
     '''Off-policy Monte Carlo state and action value function estimation, policy 
     
     Off policy Monte Carlo method for estimating state and action-value functtions
@@ -326,11 +326,11 @@ def off_policy_mc(states: Sequence[Any], actions: Sequence[Any], transition: Tra
     if not policy and eps:
         _typecheck_all(constants=[eps])
         _check_ranges(values=[eps], ranges=[(0,1)])
-        policy = EpsilonSoftPolicy(states, actions, eps=eps)
+        policy = EpsilonSoftPolicy(actions, states, eps=eps)
     elif not policy:
-        policy = ModelFreePolicy(states, actions)
+        policy = ModelFreePolicy(actions, states)
     elif not b:
-        b = ModelFreePolicy(states, actions)
+        b = ModelFreePolicy(actions, states)
 
     _typecheck_all(tabular_idxs=[states, actions],transition=transition,
         constants=[gamma, n_episodes, max_steps, samples],
@@ -409,7 +409,7 @@ def _off_policy_monte_carlo(MF, off_policy, max_episodes, max_steps, first_visit
         if sample_step and n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode))
     
-    return v, q
+    return v, q, samples
 
 
 
@@ -485,9 +485,9 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     if not policy and eps:
         _typecheck_all(constants=[eps])
         _check_ranges(values=[eps], ranges=[(0,1)])
-        policy = EpsilonSoftPolicy(states, actions, eps=eps)
+        policy = EpsilonSoftPolicy(actions, states, eps=eps)
     elif not policy:
-        policy = ModelFreePolicy(states, actions)
+        policy = ModelFreePolicy(actions, states)
 
     _typecheck_all(tabular_idxs=[states,actions], tansition=transition,
         constants=[gamma, n, alpha, n_episodes, samples, max_steps], 
@@ -541,7 +541,7 @@ def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, sample_step):
         n_episode += 1
 
         if sample_step and n_episode % sample_step == 0:
-            samples.append(get_sample(MF, v, q, π, n_episode))
+            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
     
     return v, q, samples
 

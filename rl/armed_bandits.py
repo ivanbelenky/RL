@@ -7,7 +7,7 @@ from typing import List
 import numpy as np
 import numpy.random as rnd
 
-from utils import Policy, RewardGenerator
+from rl.utils import Policy, RewardGenerator
 
 
 GAUSSIAN = [RewardGenerator('normal', rnd.random(), rnd.random()) for _ in range(10)]

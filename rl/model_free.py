@@ -14,13 +14,13 @@ from typing import (
 
 import numpy as np
 
-from utils import Policy, State, Action, MAX_ITER, MAX_STEPS
-from solvers import (
-    first_visit_monte_carlo,
-    every_visit_monte_carlo,
-    off_policy_first_visit,
-    off_policy_every_visit,
-    tdn
+from rl.utils import (
+    Policy, 
+    State, 
+    Action,
+    StateAction, 
+    MAX_ITER, 
+    MAX_STEPS
 )
 
 EpisodeStep = NewType(
@@ -83,6 +83,8 @@ class ModelFree:
         self.policy = policy
         self.states = State(states)
         self.actions = Action(actions)
+        self.stateaction = StateAction(
+            [(s,a) for s,a in zip(states, actions)])
         self.transition = transition
         self.gamma = gamma
         self.policy = policy if policy else ModelFreePolicy(

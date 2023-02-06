@@ -1,5 +1,7 @@
 import random
 
+from rl.solvers import alpha_mc 
+
 VALUES = ['A','2','3','4','5','6','7','8','9','10','J','Q','K']
 SUITS = ['♠','♥','♦','♣']
 CARDS = [(value,suit) for value in VALUES for suit in SUITS]
@@ -59,7 +61,6 @@ def black_jack_transition(state, action):
             new_state = (player_sum, usable_ace, dealer_showing)
             return (new_state, 0.), False
     
-
     dealer_cards = [dealer_showing]
     dealer_sum = count(dealer_cards)
     if action == 'stand':
@@ -80,3 +81,9 @@ def black_jack_transition(state, action):
         return (state, 1.), True
     elif dealer_sum == player_sum:
         return (state, 0.), True
+
+
+vqpi, samples = alpha_mc(states, actions, black_jack_transition, gamma=0.9,
+    use_N=True, n_episodes=1E4, first_visit=False)
+
+ 
