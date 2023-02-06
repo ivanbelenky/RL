@@ -270,7 +270,7 @@ def _visit_monte_carlo(MF, first_visit, exploring_starts, use_N, alpha,
 
 
 def off_policy_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
-    gamma: float=0.9, first_visit: bool=True, ordinary: bool=True,  
+    gamma: float=0.9, first_visit: bool=True, ordinary: bool=False,  
     n_episodes: int=MAX_ITER, max_steps: int=MAX_STEPS, samples: int=1000, 
     optimize: bool=False, policy: ModelFreePolicy=None, eps: float=None, 
     b: ModelFreePolicy=None) -> Tuple[VQPi, Samples]: 
@@ -342,8 +342,8 @@ def off_policy_mc(states: Sequence[Any], actions: Sequence[Any], transition: Tra
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)    
-    v, q, samples = _off_policy_monte_carlo(model, first_visit, n_episodes, 
-        max_steps, optimize, ordinary, sample_step)
+    v, q, samples = _off_policy_monte_carlo(model, b, n_episodes, 
+        max_steps, first_visit, ordinary, optimize, sample_step)
 
     return VQPi((v, q, policy)), samples
 
@@ -367,7 +367,7 @@ def _mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q,
     return False
 
 
-def _off_policy_monte_carlo(MF, off_policy, max_episodes, max_steps, first_visit,
+def _off_policy_monte_carlo(MF, off_policy, n_episodes, max_steps, first_visit,
     ordinary, optimize, sample_step):
 
     γ = MF.gamma
@@ -381,7 +381,7 @@ def _off_policy_monte_carlo(MF, off_policy, max_episodes, max_steps, first_visit
     v, q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
     c, c_q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
 
-    while n_episode < max_episodes:
+    while n_episode < n_episodes:
         G = 0
         s_0, a_0 = MF.random_sa(value=True)
         episode = MF.generate_episode(s_0, a_0, b, max_steps)
@@ -407,7 +407,7 @@ def _off_policy_monte_carlo(MF, off_policy, max_episodes, max_steps, first_visit
         n_episode += 1
 
         if sample_step and n_episode % sample_step == 0:
-            samples.append(get_sample(MF, v, q, π, n_episode))
+            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
     
     return v, q, samples
 
