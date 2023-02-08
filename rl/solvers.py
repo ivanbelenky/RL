@@ -40,6 +40,17 @@ def get_sample(MF, v, q, π, n_episode, optimize):
     return (_idx, _v, _q, _pi)
 
 
+def _set_policy(policy, eps, actions, states):
+    if not policy and eps:
+        _typecheck_all(constants=[eps])
+        _check_ranges(values=[eps], ranges=[(0,1)])
+        policy = EpsilonSoftPolicy(actions, states, eps=eps)
+    elif not policy:
+        policy = ModelFreePolicy(actions, states)
+    
+    return policy
+    
+
 def vq_π_iter_naive(MDP, policy: Policy, tol: float = TOL,
     max_iters: int = MAX_ITER) -> np.ndarray:
 
@@ -425,7 +436,8 @@ def _off_policy_monte_carlo(MF, off_policy, n_episodes, max_steps, first_visit,
 def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     gamma: float=0.9, n: int=1, alpha: float=0.05, n_episodes: int=MAX_ITER,
     policy: ModelFreePolicy=None, eps: float=None, optimize: bool=False, 
-    samples: int = 1000, max_steps: int=MAX_STEPS) -> Tuple[VQPi, Samples]:
+    method: str='sarsa', samples: int = 1000, max_steps: int=MAX_STEPS
+    ) -> Tuple[VQPi, Samples]:
     '''N-temporal differences algorithm.
 
     Temporal differences algorithm for estimating the value function of a
@@ -491,12 +503,10 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     >>> tdn(states, actions, state_transition, gamma=1, n=3, alpha=0.05)
     (array([0.134]), array([[0.513., 0.]]), <class 'ModelFreePolicy'>, None)
     '''    
-    if not policy and eps:
-        _typecheck_all(constants=[eps])
-        _check_ranges(values=[eps], ranges=[(0,1)])
-        policy = EpsilonSoftPolicy(actions, states, eps=eps)
-    elif not policy:
-        policy = ModelFreePolicy(actions, states)
+    policy = _set_policy(policy, eps, states, actions)
+    
+    if method not in ['sarsa', 'qlearning', 'expected_sarsa', 'dqlearning']:
+        raise ValueError(f'Unknown method {method}')
 
     _typecheck_all(tabular_idxs=[states,actions], tansition=transition,
         constants=[gamma, n, alpha, n_episodes, samples, max_steps], 
@@ -506,7 +516,7 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)    
     v, q, samples = _tdn(model, n, alpha, n_episodes, max_steps, optimize,
-        sample_step)
+        method, sample_step)
     
     return VQPi((v, q, model.policy.pi)), samples
 
@@ -520,9 +530,24 @@ def _td_step(s, a, r, t, T, n, v, q, γ, α, gammatron):
     v[s_t] = v[s_t] + α * (G - v[s_t])
     q_key = (s_t, a_t)
     q[q_key] = q[q_key] + α * (G - q[q_key])
+    
 
+def _td_qlearning(s, a, r, t, T, n, v, q, γ, α, gammatron):
+    '''td qlearning update'''
+    s_t, a_t, rr = s[t], a[t], r[t:t+n]
+    G = np.dot(gammatron[:rr.shape[0]], rr)
+    if t + n < T:
+        G = G + γ**n * np.max(q[s[t+n]])
+    q_key = (s_t, a_t)
+    q[q_key] = q[q_key] + α * (G - q[q_key])
+    
 
-def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, sample_step):
+METHOD_MAP = {
+    'sarsa': _td_step,
+    'qlearning': _td_qlearning,
+}
+
+def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, method, sample_step):
     '''N-temporal differences algorithm.'''
     π = MF.policy
     α = alpha
@@ -530,8 +555,10 @@ def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, sample_step):
     gammatron = np.array([γ**i for i in range(n)])
 
     v, q = MF.init_vq()
-    
+
     samples = []
+
+    f_step = METHOD_MAP[method]
 
     n_episode = 0
     while n_episode < n_episodes:
@@ -543,7 +570,7 @@ def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, sample_step):
         T = s.shape[0]
         
         for t in range(T):
-            _td_step(s, a, r, t, T, n, v, q, γ, α, gammatron)
+            f_step(s, a, r, t, T, n, v, q, γ, α, gammatron)
             if optimize:
                 π.update(q, s[t]) # inplace update
         
@@ -553,6 +580,11 @@ def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, sample_step):
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
     
     return v, q, samples
+
+
+
+    
+
 
 
 # temporal difference control SARSA, QLeearning, and some others
