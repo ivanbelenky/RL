@@ -101,10 +101,8 @@ class ModelFree:
         return s, a
 
     def _to_index(self, state, action):
-        if not isinstance(state, int):
-            state = self.states.get_index(state)
-        if not isinstance(action, int):
-            action = self.actions.get_index(action)
+        state = self.states.get_index(state)
+        action = self.actions.get_index(action)
 
         return state, action
 

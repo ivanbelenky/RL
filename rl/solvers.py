@@ -503,12 +503,12 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     >>> tdn(states, actions, state_transition, gamma=1, n=3, alpha=0.05)
     (array([0.134]), array([[0.513., 0.]]), <class 'ModelFreePolicy'>, None)
     '''    
-    policy = _set_policy(policy, eps, states, actions)
-    
+    policy = _set_policy(policy, eps, actions, states)
+
     if method not in ['sarsa', 'qlearning', 'expected_sarsa', 'dqlearning']:
         raise ValueError(f'Unknown method {method}')
 
-    _typecheck_all(tabular_idxs=[states,actions], tansition=transition,
+    _typecheck_all(tabular_idxs=[states,actions], transition=transition,
         constants=[gamma, n, alpha, n_episodes, samples, max_steps], 
         booleans=[optimize], policies=[policy])
 
@@ -557,6 +557,12 @@ def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, method, sample_step):
     v, q = MF.init_vq()
 
     samples = []
+
+    if method in ['qlearning'] and not optimize:
+        # TODO: implement logger
+        # logger.warning(
+        #     'Optimization is disabled, qlearning will be equivalent to sarsa')
+        pass
 
     f_step = METHOD_MAP[method]
 
