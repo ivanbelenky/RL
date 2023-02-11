@@ -527,6 +527,7 @@ def _td_step(s, a, r, t, T, n, v, q, γ, α, gammatron):
     G = np.dot(gammatron[:rr.shape[0]], rr)
     if t + n < T:
         G = G + γ**n * v[s[t+n]]
+
     v[s_t] = v[s_t] + α * (G - v[s_t])
     q_key = (s_t, a_t)
     q[q_key] = q[q_key] + α * (G - q[q_key])
@@ -538,6 +539,8 @@ def _td_qlearning(s, a, r, t, T, n, v, q, γ, α, gammatron):
     G = np.dot(gammatron[:rr.shape[0]], rr)
     if t + n < T:
         G = G + γ**n * np.max(q[s[t+n]])
+
+    v[s_t] = v[s_t] + α * (G - v[s_t])
     q_key = (s_t, a_t)
     q[q_key] = q[q_key] + α * (G - q[q_key])
     

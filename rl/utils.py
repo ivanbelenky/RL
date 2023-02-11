@@ -84,7 +84,6 @@ class Qpi(_TabularValues):
     def __str__(self):
         return f'Vpi({self.v[:10]}...)'
 
-    
 
 VQPi = NewType('VQPi', Tuple[Vpi, Qpi, Policy])
 Samples = NewType('Samples', Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]])
@@ -128,6 +127,7 @@ def _typecheck_transition(transition):
             f"transition must have two positional arguments,"
             f" not {transition.__code__.co_argcount}")   
  
+
 def _typecheck_constants(*args):
     for arg in args:
         if not isinstance(arg, (float, int)):
@@ -170,8 +170,8 @@ def _get_sample_step(samples, n_episodes):
     sample_step = int(n_episodes / samples)
     return sample_step
 
+
 def _check_ranges(values, ranges):
     for v, r in zip(values, ranges):
         if v < r[0] or v > r[1]:
             raise ValueError(f"{v} is out of range {r}")
-
