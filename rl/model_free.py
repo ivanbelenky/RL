@@ -50,8 +50,11 @@ class ModelFreePolicy(Policy):
     def update_policy(self, q, s):
         qs_mask = q[s] == np.max(q[s])
         self.pi[s] = np.where(qs_mask, 1/qs_mask.sum(), 0)
-        
 
+    def _make_deterministic(self):
+        self.pi = np.eye(self.A)[np.argmax(self.pi, axis=1)]
+
+        
 class EpsilonSoftPolicy(ModelFreePolicy):
     def __init__(self, A, S, eps):
         super().__init__(A, S)
@@ -60,6 +63,7 @@ class EpsilonSoftPolicy(ModelFreePolicy):
     def update_policy(self, q, s):
         self.pi[s, :] = self.Ɛ/self.A
         self.pi[s, np.argmax(q[s])] += 1 - self.Ɛ
+
 
 
 class ModelFree:
