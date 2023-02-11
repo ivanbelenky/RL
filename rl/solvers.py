@@ -182,7 +182,6 @@ def alpha_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transiti
 
     Raises
     ------
-    TypeError: arguments check.
     TransitionException: transition calls function checks.
     '''
     if not policy and eps:
@@ -331,7 +330,6 @@ def off_policy_mc(states: Sequence[Any], actions: Sequence[Any], transition: Tra
 
     Raises
     ------
-    TypeError: arguments check.
     TransitionException: transition calls function checks.
     '''
     if not policy and eps:
@@ -436,7 +434,7 @@ def _off_policy_monte_carlo(MF, off_policy, n_episodes, max_steps, first_visit,
 def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     state_0: Any=None, action_0: Any=None, gamma: float=0.9, n: int=1, 
     alpha: float=0.05, n_episodes: int=MAX_ITER, policy: ModelFreePolicy=None, 
-    eps: float=None, optimize: bool=False, method: str='sarsa', samples: int = 1000, 
+    eps: float=None, optimize: bool=False, method: str='sarsa', samples: int=1000, 
     max_steps: int=MAX_STEPS) -> Tuple[VQPi, Samples]:
     '''N-temporal differences algorithm.
 
@@ -509,8 +507,11 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     '''    
     policy = _set_policy(policy, eps, actions, states)
 
-    if method not in ['sarsa', 'qlearning', 'expected_sarsa', 'dqlearning']:
-        raise ValueError(f'Unknown method {method}')
+    if method not in ['sarsa', 'sarsa_on', 'qlearning', 'expected_sarsa', 'dqlearning']:
+        raise ValueError(
+            f'Unknown method {method}\n'
+            'Available methods are (sarsa, sarsa_on, qlearning, expected_sarsa'
+            ', dqlearning)')
 
     _typecheck_all(tabular_idxs=[states,actions], transition=transition,
         constants=[gamma, n, alpha, n_episodes, samples, max_steps], 
@@ -518,9 +519,11 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)    
-    v, q, samples = _tdn(model, state_0, action_0, n, alpha, n_episodes, max_steps, optimize,
-        method, sample_step)
+    model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)  
+    
+    _tdn = _tdn_on if method == 'sarsa_on' else _tdn_onoff
+    v, q, samples = _tdn(model, state_0, action_0, n, alpha, n_episodes,
+        max_steps, optimize, method, sample_step)
     
     return VQPi((v, q, model.policy.pi)), samples
 
@@ -529,12 +532,14 @@ def _td_step(s, a, r, t, T, n, v, q, γ, α, gammatron):
     '''td step update'''
     s_t, a_t, rr = s[t], a[t], r[t:t+n]
     G = np.dot(gammatron[:rr.shape[0]], rr)
+    G_v, G_q = G, G
     if t + n < T:
-        G = G + γ**n * v[s[t+n]]
+        G_v = G_v + γ**n * v[s[t+n]]
+        G_q = G_v + γ**n * q[s[t+n], a[t+n]]
 
-    v[s_t] = v[s_t] + α * (G - v[s_t])
+    v[s_t] = v[s_t] + α * (G_v - v[s_t])
     q_key = (s_t, a_t)
-    q[q_key] = q[q_key] + α * (G - q[q_key])
+    q[q_key] = q[q_key] + α * (G_q - q[q_key])
     
 
 def _td_qlearning(s, a, r, t, T, n, v, q, γ, α, gammatron):
@@ -554,8 +559,14 @@ METHOD_MAP = {
     'qlearning': _td_qlearning,
 }
 
-def _tdn(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, method, sample_step):
-    '''N-temporal differences algorithm.'''
+
+def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
+    method, sample_step):
+    '''N-temporal differences algorithm for learning.
+    
+    Super slow and inefficient, but readable and replicated exactly
+    from sutton's n-step SARSA
+    '''
     π = MF.policy
     α = alpha
     γ = MF.gamma
@@ -564,15 +575,75 @@ def _tdn(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, method, sample
     v, q = MF.init_vq()
 
     samples = []
+    n_episode = 0
+    while n_episode < n_episodes:
+        if not s_0 or not a_0:
+           s_0, a_0 = MF.random_sa(value=True) 
+        s = MF.states.get_index(s_0)
+        a = MF.actions.get_index(a_0)
+        T = int(max_steps)
+        R = []
+        A = [a]
+        S = [s]
+        G = 0
+        for t in range(T):
+            if t < T:
+                (s, r), end = MF.step_transition(s, a)
+                R.append(r)
+                S.append(s)
+                if end:
+                    T = t + 1
+                else:
+                    a = π(s)
+                    A.append(a)
+            
+            tau = t - n + 1
+            if tau >= 0:
+                rr = np.array(R[tau:min(tau+n, T)])
+                G = gammatron[:rr.shape[0]].dot(rr)
+                G_v, G_q = G, G
+                if tau + n < T:
+                    G_v = G_v + γ**n * v[S[tau+n]]
+                    G_q = G_v + γ**n * q[S[tau+n], A[tau+n]]
+                
+                s_t = S[tau]
+                a_t = A[tau]
+                v[s_t] = v[s_t] + α * (G_v - v[s_t])
+                q[(s_t, a_t)] = q[(s_t, a_t)] + α * (G_q - q[(s_t, a_t)])
+                
+                π.update_policy(q, s_t)
 
-    if method in ['qlearning'] and not optimize:
-        # TODO: implement logger
-        # logger.warning(
-        #     'Optimization is disabled, qlearning will be equivalent to sarsa')
-        pass
+            if tau == T - 1:
+                break
+
+        if n_episode % sample_step == 0:
+            samples.append((n_episode, v.copy(), q.copy(), π.pi.copy()))
+        n_episode += 1
+
+    return v, q, samples
+
+
+def _tdn_onoff(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, 
+    method, sample_step):
+    '''N-temporal differences algorithm.
+    
+    This is the basic implementation of the N-temporal difference algorithm. 
+    When optimizing the policy, the method for updating will be quasi-off 
+    policy. That is the updates are taking place with respect to the q-values
+    updated on each step, but each step corresponds to the old policy. This 
+    implies that at the beginning of the updates are strictly on policy, and 
+    at the end, when probably all the states have been visited, the updates 
+    are off policy. 
+    '''
+    π = MF.policy
+    α = alpha
+    γ = MF.gamma
+    gammatron = np.array([γ**i for i in range(n)])
+    v, q = MF.init_vq()
 
     f_step = METHOD_MAP[method]
 
+    samples = []
     n_episode = 0
     while n_episode < n_episodes:
         if not s_0 or not a_0:
@@ -585,8 +656,12 @@ def _tdn(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, method, sample
         
         for t in range(T):
             f_step(s, a, r, t, T, n, v, q, γ, α, gammatron)
-            if optimize:
-                π.update_policy(q, s[t]) # inplace update
+            # episode is already set so next step is not generated
+            # via a greedy strategy, each episode generation is greedy
+            if optimize:  
+                # in/out-place update for current and next episode
+                # off policy without importance weighting
+                π.update_policy(q, s[t]) 
         
         n_episode += 1
 
@@ -594,8 +669,6 @@ def _tdn(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, method, sample
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
     
     return v, q, samples
-
-
 
     
 

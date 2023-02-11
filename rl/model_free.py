@@ -155,3 +155,12 @@ class ModelFree:
             step += 1
 
         return episode
+
+    def step_transition(self, state: int, action: int):
+        s, a = self.states.from_index(state), self.actions.from_index(action)
+        (s_t, r_t), end = self._transition(s, a)
+        s_new = self.states.get_index(s_t)
+        return (s_new, r_t), end
+
+
+

@@ -1,10 +1,9 @@
-from .model_free import ModelFree, ModelFreePolicy, EpsilonSoftPolicy
+from .model_free import ModelFree, ModelFreePolicy, EpsilonSoftPolicy, TransitionException
 from .solvers import (
     tdn, 
     alpha_mc, 
     off_policy_mc
 )
-
 
 __all__ = [
     'utils',
@@ -14,4 +13,5 @@ __all__ = [
     'tdn',
     'alpha_mc',
     'off_policy_mc',
+    'TransitionException'
 ]
