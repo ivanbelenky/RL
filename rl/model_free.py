@@ -59,7 +59,7 @@ class EpsilonSoftPolicy(ModelFreePolicy):
 
     def update_policy(self, q, s):
         self.pi[s, :] = self.Ɛ/self.A
-        self.pi[s, np.argmax(q)] += 1 - self.Ɛ
+        self.pi[s, np.argmax(q[s])] += 1 - self.Ɛ
 
 
 class ModelFree:

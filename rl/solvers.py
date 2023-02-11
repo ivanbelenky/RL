@@ -36,7 +36,7 @@ def get_sample(MF, v, q, π, n_episode, optimize):
     _v, _q = Vpi(v.copy(), MF.states), Qpi(q.copy(), MF.stateaction)
     _pi = None
     if optimize:
-        _pi = π.pi.copy() 
+        _pi = π.pi.copy()
     return (_idx, _v, _q, _pi)
 
 
@@ -434,10 +434,10 @@ def _off_policy_monte_carlo(MF, off_policy, n_episodes, max_steps, first_visit,
 
 
 def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
-    gamma: float=0.9, n: int=1, alpha: float=0.05, n_episodes: int=MAX_ITER,
-    policy: ModelFreePolicy=None, eps: float=None, optimize: bool=False, 
-    method: str='sarsa', samples: int = 1000, max_steps: int=MAX_STEPS
-    ) -> Tuple[VQPi, Samples]:
+    state_0: Any=None, action_0: Any=None, gamma: float=0.9, n: int=1, 
+    alpha: float=0.05, n_episodes: int=MAX_ITER, policy: ModelFreePolicy=None, 
+    eps: float=None, optimize: bool=False, method: str='sarsa', samples: int = 1000, 
+    max_steps: int=MAX_STEPS) -> Tuple[VQPi, Samples]:
     '''N-temporal differences algorithm.
 
     Temporal differences algorithm for estimating the value function of a
@@ -447,6 +447,10 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     ----------
     states : Sequence[Any]
     actions : Sequence[Any]
+    state_0 : Any, optional
+        Initial state, by default None (random)
+    action_0 : Any, optional
+        Initial action, by default None (random)
     transition : Callable[[Any,Any],[[Any,float], bool]]]
         transition must be a callable function that takes as arguments the
         (state, action) and returns (new_state, reward), end.
@@ -515,7 +519,7 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)    
-    v, q, samples = _tdn(model, n, alpha, n_episodes, max_steps, optimize,
+    v, q, samples = _tdn(model, state_0, action_0, n, alpha, n_episodes, max_steps, optimize,
         method, sample_step)
     
     return VQPi((v, q, model.policy.pi)), samples
@@ -550,7 +554,7 @@ METHOD_MAP = {
     'qlearning': _td_qlearning,
 }
 
-def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, method, sample_step):
+def _tdn(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, method, sample_step):
     '''N-temporal differences algorithm.'''
     π = MF.policy
     α = alpha
@@ -571,7 +575,8 @@ def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, method, sample_step):
 
     n_episode = 0
     while n_episode < n_episodes:
-        s_0, a_0 = MF.random_sa(value=True)
+        if not s_0 or not a_0:
+           s_0, a_0 = MF.random_sa(value=True) 
         episode = MF.generate_episode(s_0, a_0, π, max_steps)
         
         sar = np.array(episode)
@@ -581,7 +586,7 @@ def _tdn(MF, n, alpha, n_episodes, max_steps, optimize, method, sample_step):
         for t in range(T):
             f_step(s, a, r, t, T, n, v, q, γ, α, gammatron)
             if optimize:
-                π.update(q, s[t]) # inplace update
+                π.update_policy(q, s[t]) # inplace update
         
         n_episode += 1
 
