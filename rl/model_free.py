@@ -23,6 +23,7 @@ from rl.utils import (
     MAX_STEPS
 )
 
+
 EpisodeStep = NewType(
     'EpisodeStep', Tuple[int, int, float])
 

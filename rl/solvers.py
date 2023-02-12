@@ -508,7 +508,7 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     '''    
     policy = _set_policy(policy, eps, actions, states)
 
-    if method not in ['sarsa', 'sarsa_on', 'qlearning', 'expected_sarsa', 'dqlearning']:
+    if method not in ['sarsa', 'sarsa_on', 'qlearning', 'expected_sarsa']:
         raise ValueError(
             f'Unknown method {method}\n'
             'Available methods are (sarsa, sarsa_on, qlearning, expected_sarsa'
@@ -681,6 +681,134 @@ def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
                 q[(s_t, a_t)] = q[(s_t, a_t)] + α * (G_q - q[(s_t, a_t)])
                 
                 π.update_policy(q, s_t)
+
+            if tau == T - 1:
+                break
+
+        if n_episode % sample_step == 0:
+            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+        n_episode += 1
+
+    return v, q, samples
+
+
+
+def n_tree_backup(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
+    state_0: Any=None, action_0: Any=None, gamma: float=1.0, n: int=1, 
+    alpha: float=0.05, n_episodes: int=MAX_ITER, policy: ModelFreePolicy=None, 
+    eps: float=None, optimize: bool=False, samples: int=1000, max_steps: int=MAX_STEPS
+    ) -> Tuple[VQPi, Samples]:
+    '''N-temporal differences algorithm.
+
+    Temporal differences algorithm for estimating the value function of a
+    policy, improve it and analyze it.
+
+    Parameters
+    ----------
+    states : Sequence[Any]
+    actions : Sequence[Any]
+    state_0 : Any, optional
+        Initial state, by default None (random)
+    action_0 : Any, optional
+        Initial action, by default None (random)
+    transition : Callable[[Any,Any],[[Any,float], bool]]]
+        transition must be a callable function that takes as arguments the
+        (state, action) and returns (new_state, reward), end.
+    gamma : float, optional
+        Discount factor, by default 0.9
+    n : int, optional
+        Number of steps to look ahead, by default 1
+    alpha : float, optional
+        Learning rate, by default 0.1
+    n_episodes : int, optional
+        Number of episodes to simulate, by default 1E4
+    max_steps : int, optional
+        Maximum number of steps per episode, by default 1E3
+    policy : ModelFreePolicy, optional
+        Policy to use, by default equal probability ModelFreePolicy
+    eps : float, optional
+        Epsilon value for the epsilon-soft policy, by default None (no exploration)
+    optimize : bool, optional
+        Whether to optimize the policy or not, by default False
+    samples : int, optional
+        Number of samples to take, by default 1000
+    
+    Returns
+    -------
+    vqpi : Tuple[VPi, QPi, Policy]
+        Value function, action-value function, policy and samples if any.
+    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]] 
+        Samples taken during the simulation if any. The first element is the
+        index of the iteration, the second is the value function, the third is
+        the action-value function and the fourth is the TODO:.
+
+    Raises
+    ------
+    TransitionException: If any of the arguments is not of the correct type.
+    '''    
+    policy = _set_policy(policy, eps, actions, states)
+
+    _typecheck_all(tabular_idxs=[states,actions], transition=transition,
+        constants=[gamma, n, alpha, n_episodes, samples, max_steps], 
+        booleans=[optimize], policies=[policy])
+
+    sample_step = _get_sample_step(samples, n_episodes)
+
+    model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)  
+    
+    v, q, samples = _n_tree_backup(model, state_0, action_0, n, alpha, n_episodes,
+        max_steps, optimize, sample_step)
+    
+    return VQPi((v, q, policy)), samples
+
+
+def _n_tree_backup(MF, s_0, a_0, n, alpha, n_episodes, max_steps, 
+    optimize, sample_step):
+
+    π = MF.policy
+    α = alpha
+    γ = MF.gamma
+
+    v, q = MF.init_vq()
+
+    samples = []
+    n_episode = 0
+    while n_episode < n_episodes:
+        if not s_0:
+           s_0, _ = MF.random_sa() 
+        if not a_0:
+            _, a_0 = MF.random_sa()
+
+        s = MF.states.get_index(s_0)
+        a = MF.actions.get_index(a_0)
+        T = int(max_steps)
+        R = []
+        A = [a]
+        S = [s]
+        G = 0
+        for t in range(T):
+            if t < T:
+                (s, r), end = MF.step_transition(s, a)
+                R.append(r)
+                S.append(s)
+                if end:
+                    T = t + 1
+                else:
+                    _, a = MF.random_sa()
+                    A.append(a)
+
+            tau = t - n + 1
+            if tau >= 0:
+                if t + 1 >= T:
+                    G = R[-1]
+                else:
+                    G = R[t] + γ*np.dot(π.pi[s[t]], q[s[t]])
+                for k in range(min(t, T-1), tau):
+                    G = R[k-1] + γ*np.dot(π.pi[s[k-1]], q[s[k-1]]) + \
+                        γ*π.pi[s[k-1],A[k-1]]*(G-q[s[k-1], A[k-1]])
+                q[S[tau], A[tau]] = q[S[tau], A[tau]] + α[G-q[S[tau], A[tau]]]  
+                if optimize:
+                    π.update_policy(q, S[tau])
 
             if tau == T - 1:
                 break
