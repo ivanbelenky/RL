@@ -36,7 +36,8 @@ def get_sample(MF, v, q, π, n_episode, optimize):
     _v, _q = Vpi(v.copy(), MF.states), Qpi(q.copy(), MF.stateaction)
     _pi = None
     if optimize:
-        _pi = π.pi.copy()
+        _pi = ModelFreePolicy(MF.actions.N, MF.states.N)
+        _pi.pi = π.pi.copy()
     return (_idx, _v, _q, _pi)
 
 
@@ -525,102 +526,51 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     v, q, samples = _tdn(model, state_0, action_0, n, alpha, n_episodes,
         max_steps, optimize, method, sample_step)
     
-    return VQPi((v, q, model.policy.pi)), samples
+    return VQPi((v, q, policy)), samples
 
 
-def _td_step(s, a, r, t, T, n, v, q, γ, α, gammatron):
+def _td_step(s, a, r, t, T, n, v, q, γ, α, gammatron, π=None):
     '''td step update'''
     s_t, a_t, rr = s[t], a[t], r[t:t+n]
     G = np.dot(gammatron[:rr.shape[0]], rr)
     G_v, G_q = G, G
     if t + n < T:
-        G_v = G_v + γ**n * v[s[t+n]]
-        G_q = G_v + γ**n * q[s[t+n], a[t+n]]
+        G_v = G_v + (γ**n) * v[s[t+n]]
+        G_q = G_q + (γ**n) * q[s[t+n], a[t+n]]
 
     v[s_t] = v[s_t] + α * (G_v - v[s_t])
     q_key = (s_t, a_t)
     q[q_key] = q[q_key] + α * (G_q - q[q_key])
     
 
-def _td_qlearning(s, a, r, t, T, n, v, q, γ, α, gammatron):
+def _td_qlearning(s, a, r, t, T, n, v, q, γ, α, gammatron, π=None):
     '''td qlearning update'''
     s_t, a_t, rr = s[t], a[t], r[t:t+n]
     G = np.dot(gammatron[:rr.shape[0]], rr)
     if t + n < T:
-        G = G + γ**n * np.max(q[s[t+n]])
+        G = G + (γ**n) * np.max(q[s[t+n]])
 
     v[s_t] = v[s_t] + α * (G - v[s_t])
     q_key = (s_t, a_t)
     q[q_key] = q[q_key] + α * (G - q[q_key])
     
 
+def _td_expected_sarsa(s, a, r, t, T, n, v, q, γ, α, gammatron, π=None):
+    s_t, a_t, rr = s[t], a[t], r[t:t+n]
+    G = np.dot(gammatron[:rr.shape[0]], rr)
+    if t + n < T:
+        G = G + (γ**n) * np.dot(π.pi[s[t+n]], q[s[t+n]])
+    
+    v[s_t] = v[s_t] + α * (G - v[s_t])
+    q_key = (s_t, a_t)
+    q[q_key] = q[q_key] + α * (G - q[q_key])
+
+
 METHOD_MAP = {
     'sarsa': _td_step,
     'qlearning': _td_qlearning,
+    'expected_sarsa': _td_expected_sarsa,   
 }
-
-
-def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
-    method, sample_step):
-    '''N-temporal differences algorithm for learning.
-    
-    Super slow and inefficient, but readable and replicated exactly
-    from sutton's n-step SARSA
-    '''
-    π = MF.policy
-    α = alpha
-    γ = MF.gamma
-    gammatron = np.array([γ**i for i in range(n)])
-
-    v, q = MF.init_vq()
-
-    samples = []
-    n_episode = 0
-    while n_episode < n_episodes:
-        if not s_0 or not a_0:
-           s_0, a_0 = MF.random_sa(value=True) 
-        s = MF.states.get_index(s_0)
-        a = MF.actions.get_index(a_0)
-        T = int(max_steps)
-        R = []
-        A = [a]
-        S = [s]
-        G = 0
-        for t in range(T):
-            if t < T:
-                (s, r), end = MF.step_transition(s, a)
-                R.append(r)
-                S.append(s)
-                if end:
-                    T = t + 1
-                else:
-                    a = π(s)
-                    A.append(a)
-            
-            tau = t - n + 1
-            if tau >= 0:
-                rr = np.array(R[tau:min(tau+n, T)])
-                G = gammatron[:rr.shape[0]].dot(rr)
-                G_v, G_q = G, G
-                if tau + n < T:
-                    G_v = G_v + γ**n * v[S[tau+n]]
-                    G_q = G_v + γ**n * q[S[tau+n], A[tau+n]]
-                
-                s_t = S[tau]
-                a_t = A[tau]
-                v[s_t] = v[s_t] + α * (G_v - v[s_t])
-                q[(s_t, a_t)] = q[(s_t, a_t)] + α * (G_q - q[(s_t, a_t)])
-                
-                π.update_policy(q, s_t)
-
-            if tau == T - 1:
-                break
-
-        if n_episode % sample_step == 0:
-            samples.append((n_episode, v.copy(), q.copy(), π.pi.copy()))
-        n_episode += 1
-
-    return v, q, samples
 
 
 def _tdn_onoff(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, 
@@ -646,16 +596,21 @@ def _tdn_onoff(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     samples = []
     n_episode = 0
     while n_episode < n_episodes:
-        if not s_0 or not a_0:
-           s_0, a_0 = MF.random_sa(value=True) 
+        if not s_0:
+           s_0, _ = MF.random_sa(value=True) 
+        if not a_0:
+            _, a_0 = MF.random_sa(value=True)
         episode = MF.generate_episode(s_0, a_0, π, max_steps)
         
         sar = np.array(episode)
         s, a, r = sar[:,0], sar[:,1], sar[:,2]
-        T = s.shape[0]
         
+        s = s.astype(int)
+        a = a.astype(int)
+
+        T = s.shape[0]
         for t in range(T):
-            f_step(s, a, r, t, T, n, v, q, γ, α, gammatron)
+            f_step(s, a, r, t, T, n, v, q, γ, α, gammatron, π)
             # episode is already set so next step is not generated
             # via a greedy strategy, each episode generation is greedy
             if optimize:  
@@ -671,7 +626,67 @@ def _tdn_onoff(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     return v, q, samples
 
     
+def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
+    method, sample_step):
+    '''N-temporal differences algorithm for learning.
+    
+    Super slow and inefficient, but readable and replicated exactly
+    from sutton's n-step SARSA
+    '''
+    π = MF.policy
+    α = alpha
+    γ = MF.gamma
+    gammatron = np.array([γ**i for i in range(n)])
 
+    v, q = MF.init_vq()
 
+    samples = []
+    n_episode = 0
+    while n_episode < n_episodes:
+        if not s_0:
+           s_0, _ = MF.random_sa(value=True) 
+        if not a_0:
+            _, a_0 = MF.random_sa(value=True)
 
-# temporal difference control SARSA, QLeearning, and some others
+        s = MF.states.get_index(s_0)
+        a = MF.actions.get_index(a_0)
+        T = int(max_steps)
+        R = []
+        A = [a]
+        S = [s]
+        G = 0
+        for t in range(T):
+            if t < T:
+                (s, r), end = MF.step_transition(s, a)
+                R.append(r)
+                S.append(s)
+                if end:
+                    T = t + 1
+                else:
+                    a = π(s)
+                    A.append(a)
+            
+            tau = t - n + 1
+            if tau >= 0:
+                rr = np.array(R[tau:min(tau+n, T)])
+                G = gammatron[:rr.shape[0]].dot(rr)
+                G_v, G_q = G, G
+                if tau + n < T:
+                    G_v = G_v + γ**n * v[S[tau+n]]
+                    G_q = G_q + γ**n * q[S[tau+n], A[tau+n]]
+                
+                s_t = S[tau]
+                a_t = A[tau]
+                v[s_t] = v[s_t] + α * (G_v - v[s_t])
+                q[(s_t, a_t)] = q[(s_t, a_t)] + α * (G_q - q[(s_t, a_t)])
+                
+                π.update_policy(q, s_t)
+
+            if tau == T - 1:
+                break
+
+        if n_episode % sample_step == 0:
+            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+        n_episode += 1
+
+    return v, q, samples
