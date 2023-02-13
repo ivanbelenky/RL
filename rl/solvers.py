@@ -1,6 +1,7 @@
 """
 RL - Copyright © 2023 Iván Belenky @Leculette
 """
+
 from typing import (
     Tuple, 
     Sequence,  
@@ -717,10 +718,7 @@ def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
         s = MF.states.get_index(s_0)
         a = MF.actions.get_index(a_0)
         T = int(max_steps)
-        R = []
-        A = [a]
-        S = [s]
-        G = 0
+        R, A, S, G = [], [a], [s], 0 
         for t in range(T):
             if t < T:
                 (s, r), end = MF.step_transition(s, a)
@@ -856,10 +854,8 @@ def _n_tree_backup(MF, s_0, a_0, n, alpha, n_episodes, max_steps,
         s = MF.states.get_index(s_0)
         a = MF.actions.get_index(a_0)
         T = int(max_steps)
-        R = []
-        A = [a]
-        S = [s]
-        G = 0
+        R, A, S, G = [], [a], [s], 0 
+        
         for t in range(T):
             if t < T:
                 (s, r), end = MF.step_transition(s, a)
@@ -892,6 +888,90 @@ def _n_tree_backup(MF, s_0, a_0, n, alpha, n_episodes, max_steps,
 
         if n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+        n_episode += 1
+
+    return v, q, samples
+
+
+def dynaq(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
+    state_0: Any=None, action_0: Any=None, gamma: float=1.0, kappa: float=0.01, 
+    n: int=1, plus: bool=False, alpha: float=0.05, n_episodes: int=MAX_ITER,
+    policy: ModelFreePolicy=None, eps: float=None, samples: int=1000,
+    max_steps: int=MAX_STEPS) -> Tuple[VQPi, Samples]:
+    '''
+    TODO: docs
+    '''
+    policy = _set_policy(policy, eps, actions, states)
+
+    _typecheck_all(tabular_idxs=[states,actions], transition=transition,
+        constants=[gamma, kappa, n, alpha, n_episodes, samples, max_steps], 
+        booleans=[plus], policies=[policy])
+
+    # check ranges
+    
+    sample_step = _get_sample_step(samples, n_episodes)
+
+    model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
+    v, q, samples = _dyna_q(model, state_0, action_0, n, alpha, kappa, plus,
+        n_episodes, max_steps, sample_step)
+
+
+
+def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
+    sample_step):
+
+    π = MF.policy
+    α = alpha
+    γ = MF.gamma
+    κ = kappa
+
+    v, q = MF.init_vq()
+    
+    S, A = MF.states.N, MF.actions.N
+    model_sas = np.zeros((S, A), dtype=int)
+    model_sar = np.zeros((S, A), dtype=float)
+    times_sa = np.zeros((S, A), dtype=int)
+
+    samples = []
+    current_t = 0
+    n_episode = 0
+    while n_episode < n_episodes:
+        s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
+
+        s = MF.states.get_index(s_0)
+        a = MF.actions.get_index(a_0)
+        T = int(max_steps)
+        
+        for t in range(T):
+            (s, r), end = MF.step_transition(s, a)
+            a = π(q, s)
+            q[s, a] = q[s, a] + α*(r + γ*q[model_sas[s, a], a] - q[s, a])
+            
+            times_sa[s, a] += current_t
+
+            # assuming deterministic environment
+            model_sas[s, a] = s
+            model_sar[s, a] = r
+            
+            current_t += 1
+
+            for _ in range(n):
+                rs, ra = MF.random_sa()
+                s_ = model_sas[rs, ra]
+                r_ = model_sar[rs, ra]
+                R = r_
+                if plus:
+                    tau = current_t - times_sa[rs, ra]
+                    R = R + κ*np.sqrt(tau)
+                q[rs, ra] = q[rs, ra] + α*(R + γ*q[s_, a] - q[rs, ra])
+            
+            π.update_policy(q, s)
+
+            if end:
+                break 
+        
+        if n_episode % sample_step == 0:
+            samples.append(get_sample(MF, v, q, π, n_episode, True))
         n_episode += 1
 
     return v, q, samples
