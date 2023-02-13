@@ -655,10 +655,9 @@ def _td_dq_step(s, a, r, t, T, n, v1, q1, v2, q2, γ, α, gammatron, π):
 def _double_q(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, 
     method, sample_step):
 
-    π = MF.policy
-    α = alpha
-    γ = MF.gamma
+    π, α, γ = MF.policy, alpha, MF.gamma
     gammatron = np.array([γ**i for i in range(n)])
+    
     v1, q1 = MF.init_vq()
     v2, q2 = MF.init_vq()
     v, q = MF.init_vq()
@@ -703,9 +702,7 @@ def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     Super slow and inefficient, but readable and replicated exactly
     from sutton's n-step SARSA
     '''
-    π = MF.policy
-    α = alpha
-    γ = MF.gamma
+    π, α, γ = MF.policy, alpha, MF.gamma
     gammatron = np.array([γ**i for i in range(n)])
 
     v, q = MF.init_vq()
@@ -840,9 +837,7 @@ def n_tree_backup(states: Sequence[Any], actions: Sequence[Any], transition: Tra
 def _n_tree_backup(MF, s_0, a_0, n, alpha, n_episodes, max_steps, 
     optimize, sample_step):
 
-    π = MF.policy
-    α = alpha
-    γ = MF.gamma
+    π, α, γ = MF.policy, alpha, MF.gamma
 
     v, q = MF.init_vq()
 
@@ -920,10 +915,7 @@ def dynaq(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
 def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
     sample_step):
 
-    π = MF.policy
-    α = alpha
-    γ = MF.gamma
-    κ = kappa
+    π, α, γ, κ = MF.policy, alpha, MF.gamma, kappa
 
     v, q = MF.init_vq()
     
@@ -936,36 +928,37 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
     current_t = 0
     n_episode = 0
     while n_episode < n_episodes:
-        s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
+        s_0, _ = _set_s0_a0(MF, s_0, None)
 
         s = MF.states.get_index(s_0)
-        a = MF.actions.get_index(a_0)
         T = int(max_steps)
         
         for t in range(T):
-            (s, r), end = MF.step_transition(s, a)
             a = π(q, s)
-            q[s, a] = q[s, a] + α*(r + γ*q[model_sas[s, a], a] - q[s, a])
+            (s_, r), end = MF.step_transition(s, a) # real next state
+            q[s, a] = q[s, a] + α*(r + γ*np.max(q[s_]) - q[s, a])
             
             times_sa[s, a] += current_t
 
             # assuming deterministic environment
-            model_sas[s, a] = s
+            model_sas[s, a] = s_
             model_sar[s, a] = r
             
             current_t += 1
 
             for _ in range(n):
                 rs, ra = MF.random_sa()
-                s_ = model_sas[rs, ra]
+                s_m = model_sas[rs, ra] # model next state
                 r_ = model_sar[rs, ra]
                 R = r_
                 if plus:
                     tau = current_t - times_sa[rs, ra]
                     R = R + κ*np.sqrt(tau)
-                q[rs, ra] = q[rs, ra] + α*(R + γ*q[s_, a] - q[rs, ra])
+                q[rs, ra] = q[rs, ra] + α*(R + γ*np.max(q[s_]) - q[rs, ra])
             
             π.update_policy(q, s)
+
+            s = s_ # current state equal next state
 
             if end:
                 break 
