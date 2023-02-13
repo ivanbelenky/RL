@@ -806,7 +806,7 @@ def _n_tree_backup(MF, s_0, a_0, n, alpha, n_episodes, max_steps,
                 for k in range(min(t, T-1), tau):
                     G = R[k-1] + γ*np.dot(π.pi[s[k-1]], q[s[k-1]]) + \
                         γ*π.pi[s[k-1],A[k-1]]*(G-q[s[k-1], A[k-1]])
-                q[S[tau], A[tau]] = q[S[tau], A[tau]] + α[G-q[S[tau], A[tau]]]  
+                q[S[tau], A[tau]] = q[S[tau], A[tau]] + α[G-q[S[tau], A[tau]]] 
                 if optimize:
                     π.update_policy(q, S[tau])
 
