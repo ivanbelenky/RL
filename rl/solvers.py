@@ -41,6 +41,15 @@ def get_sample(MF, v, q, π, n_episode, optimize):
     return (_idx, _v, _q, _pi)
 
 
+def _set_s0_a0(MF, s_0, a_0):
+    if not s_0:
+        s_0, _ = MF.random_sa(value=True) 
+    if not a_0:
+        _, a_0 = MF.random_sa(value=True)
+
+    return s_0, a_0
+
+
 def _set_policy(policy, eps, actions, states):
     if not policy and eps:
         _typecheck_all(constants=[eps])
@@ -508,7 +517,7 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     '''    
     policy = _set_policy(policy, eps, actions, states)
 
-    if method not in ['sarsa', 'sarsa_on', 'qlearning', 'expected_sarsa']:
+    if method not in METHODS:
         raise ValueError(
             f'Unknown method {method}\n'
             'Available methods are (sarsa, sarsa_on, qlearning, expected_sarsa'
@@ -522,7 +531,8 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)  
     
-    _tdn = _tdn_on if method == 'sarsa_on' else _tdn_onoff
+    _tdn = METHOD_MAP[method]
+
     v, q, samples = _tdn(model, state_0, action_0, n, alpha, n_episodes,
         max_steps, optimize, method, sample_step)
     
@@ -566,10 +576,10 @@ def _td_expected_sarsa(s, a, r, t, T, n, v, q, γ, α, gammatron, π=None):
     q[q_key] = q[q_key] + α * (G - q[q_key])
 
 
-METHOD_MAP = {
+STEP_MAP = {
     'sarsa': _td_step,
     'qlearning': _td_qlearning,
-    'expected_sarsa': _td_expected_sarsa,   
+    'expected_sarsa': _td_expected_sarsa,  
 }
 
 
@@ -591,7 +601,8 @@ def _tdn_onoff(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     gammatron = np.array([γ**i for i in range(n)])
     v, q = MF.init_vq()
 
-    f_step = METHOD_MAP[method]
+
+    f_step = STEP_MAP[method]
 
     samples = []
     n_episode = 0
@@ -625,7 +636,65 @@ def _tdn_onoff(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     
     return v, q, samples
 
+
+def _td_dq_step(s, a, r, t, T, n, v1, q1, v2, q2, γ, α, gammatron, π):
+    '''td step update'''
+    s_t, a_t, rr = s[t], a[t], r[t:t+n]
+    G = np.dot(gammatron[:rr.shape[0]], rr)
+    G_v, G_q = G, G
+    if t + n < T:
+        G_v = G_v + (γ**n) * v2[s[t+n]]
+        G_q = G_q + (γ**n) * q2[s[t+n], np.argmax(q1[s[t+n]])]
+
+    v1[s_t] = v1[s_t] + α * (G_v - v1[s_t])
+    q_key = (s_t, a_t)
+    q1[q_key] = q1[q_key] + α * (G_q - q1[q_key])
+
+
+def _double_q(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, 
+    method, sample_step):
+
+    π = MF.policy
+    α = alpha
+    γ = MF.gamma
+    gammatron = np.array([γ**i for i in range(n)])
+    v1, q1 = MF.init_vq()
+    v2, q2 = MF.init_vq()
+    v, q = MF.init_vq()
+
+    samples = []
+    n_episode = 0
+    while n_episode < n_episodes:
+        s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
+        episode = MF.generate_episode(s_0, a_0, π, max_steps)
+        
+        sar = np.array(episode)
+        s, a, r = sar[:,0], sar[:,1], sar[:,2]
+        
+        s = s.astype(int)
+        a = a.astype(int)
+
+        T = s.shape[0]
+        for t in range(T):
+            if np.random.rand() < 0.5:
+                _td_dq_step(s, a, r, t, T, n, v1, q1, v2, q2, γ, α, gammatron, π)
+            else:
+                _td_dq_step(s, a, r, t, T, n, v2, q2, v1, q1, γ, α, gammatron, π)
+
+            v = (v1 + v2)/2
+            q = (q1 + q2)/2
+            
+            if optimize:  
+                π.update_policy(q, s[t])
+        
+        n_episode += 1
+
+        if sample_step and n_episode % sample_step == 0:
+            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
     
+    return v, q, samples
+
+
 def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     method, sample_step):
     '''N-temporal differences algorithm for learning.
@@ -643,10 +712,7 @@ def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     samples = []
     n_episode = 0
     while n_episode < n_episodes:
-        if not s_0:
-           s_0, _ = MF.random_sa(value=True) 
-        if not a_0:
-            _, a_0 = MF.random_sa(value=True)
+        s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
 
         s = MF.states.get_index(s_0)
         a = MF.actions.get_index(a_0)
@@ -691,6 +757,17 @@ def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
 
     return v, q, samples
 
+
+METHOD_MAP = {
+    'sarsa_on': _tdn_on,
+    'sarsa': _tdn_onoff,
+    'qlearning': _tdn_onoff,
+    'expected_sarsa': _tdn_onoff, 
+    'dqlearning': _double_q
+}
+
+
+METHODS = METHOD_MAP.keys()
 
 
 def n_tree_backup(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
@@ -774,10 +851,7 @@ def _n_tree_backup(MF, s_0, a_0, n, alpha, n_episodes, max_steps,
     samples = []
     n_episode = 0
     while n_episode < n_episodes:
-        if not s_0:
-           s_0, _ = MF.random_sa() 
-        if not a_0:
-            _, a_0 = MF.random_sa()
+        s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
 
         s = MF.states.get_index(s_0)
         a = MF.actions.get_index(a_0)
@@ -803,10 +877,13 @@ def _n_tree_backup(MF, s_0, a_0, n, alpha, n_episodes, max_steps,
                     G = R[-1]
                 else:
                     G = R[t] + γ*np.dot(π.pi[s[t]], q[s[t]])
+
                 for k in range(min(t, T-1), tau):
                     G = R[k-1] + γ*np.dot(π.pi[s[k-1]], q[s[k-1]]) + \
                         γ*π.pi[s[k-1],A[k-1]]*(G-q[s[k-1], A[k-1]])
+                
                 q[S[tau], A[tau]] = q[S[tau], A[tau]] + α[G-q[S[tau], A[tau]]] 
+                
                 if optimize:
                     π.update_policy(q, S[tau])
 
