@@ -2,7 +2,8 @@ from .model_free import ModelFree, ModelFreePolicy, EpsilonSoftPolicy, Transitio
 from .solvers import (
     tdn, 
     alpha_mc, 
-    off_policy_mc
+    off_policy_mc,
+    dynaq
 )
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     'tdn',
     'alpha_mc',
     'off_policy_mc',
+    'dynaq',
     'TransitionException'
 ]

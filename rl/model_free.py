@@ -62,8 +62,12 @@ class EpsilonSoftPolicy(ModelFreePolicy):
         self.Ɛ = eps
 
     def update_policy(self, q, s):
-        self.pi[s, :] = self.Ɛ/self.A
-        self.pi[s, np.argmax(q[s])] += 1 - self.Ɛ
+        # if there are multiple actions with the same value,
+        # then we choose one of them randomly
+        max_q = np.max(q[s])
+        qs_mask = q[s] == max_q
+        self.pi[s] = self.Ɛ/self.A
+        self.pi[s, qs_mask] += (1 - self.Ɛ)/qs_mask.sum()
 
 
 

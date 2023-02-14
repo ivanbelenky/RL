@@ -910,6 +910,8 @@ def dynaq(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     v, q, samples = _dyna_q(model, state_0, action_0, n, alpha, kappa, plus,
         n_episodes, max_steps, sample_step)
 
+    return VQPi((v, q, policy)), samples
+
 
 
 def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
@@ -934,7 +936,7 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
         T = int(max_steps)
         
         for t in range(T):
-            a = π(q, s)
+            a = π(s)
             (s_, r), end = MF.step_transition(s, a) # real next state
             q[s, a] = q[s, a] + α*(r + γ*np.max(q[s_]) - q[s, a])
             
@@ -954,12 +956,10 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
                 if plus:
                     tau = current_t - times_sa[rs, ra]
                     R = R + κ*np.sqrt(tau)
-                q[rs, ra] = q[rs, ra] + α*(R + γ*np.max(q[s_]) - q[rs, ra])
+                q[rs, ra] = q[rs, ra] + α*(R + γ*np.max(q[s_m]) - q[rs, ra])
             
-            π.update_policy(q, s)
-
+            π.update_policy(q, s_)
             s = s_ # current state equal next state
-
             if end:
                 break 
         
