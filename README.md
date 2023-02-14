@@ -43,13 +43,15 @@ actions: Sequence[Any]
 transtion: Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
 ```
 
+### Examples 
 
-[](./assets/images/single_state.pngassets/images/single_state.png)
+**Single State Infinite Variance Example 5.5**
 
+![](https://github.com/ivanbelenky/RL/blob/master/assets/images/single_state.png)
 
 
 ```python
-from mypyrl import alpha_mc
+from mypyrl import off_policy_mc, ModelFreePolicy
 
 states = [0]
 actions = ['left', 'right']
@@ -64,13 +66,19 @@ def single_state_transition(state, action):
         else:
             return (state, 0), False
 
-vqpi, samples = alpha_mc(states, actions, single_state_transition,
-    alpha=0.05, first_visit=True, n_episodes=200, samples=10)
+b = ModelFreePolicy(actions, states) #by default 1 half
+pi = ModelFreePolicy(actions, states)
+pi.pi[0] = np.array([1, 0])
 
+# calculate ordinary and weighted samples state value functions
+vqpi_ord, samples_ord = off_policy_mc(states, actions, single_state_transition,
+    policy=pi, b=b, ordinary=True, first_visit=True, gamma=1., n_episodes=1E4)
+
+vqpi_w, samples_w = off_policy_mc(states, actions, single_state_transition, 
+    policy=pi, b=b, ordinary=False, first_visit=True, gamma=1., n_episodes=1E4)
 ```
 
- 
-
+![](https://github.com/ivanbelenky/RL/blob/master/assets/images/ordinary_vs_weighted.png)
 
 # Contributing
 
