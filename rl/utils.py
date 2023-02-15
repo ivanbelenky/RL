@@ -89,6 +89,24 @@ Samples = NewType('Samples', Tuple[int, List[Vpi], List[Qpi], List[Policy]])
 Transition = Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
 
 
+class PQueue:
+    def __init__(self, items: List[Tuple[float, Any]]):
+        self.items = items
+        self._sort()
+    
+    def _sort(self):
+        self.items.sort(key=lambda x: x[0])
+    
+    def push(self, item, priority):
+        self.items.append((priority, item))
+        self._sort()
+    
+    def pop(self):
+        return self.items.pop(0)[1]
+
+    def empty(self):
+        return len(self.items) == 0
+
 class RewardGenerator:
     DISTRIBUTION = {
         'bernoulli': np.random.binomial,
