@@ -49,9 +49,9 @@ class ModelFreePolicy(Policy):
         return self.pi[state, action]
     
     def update_policy(self, q, s):
-        qs_mask = q[s] == np.max(q[s])
-        self.pi[s] = np.where(qs_mask, 1/qs_mask.sum(), 0)
-
+        qs_mask = (q[s] == np.max(q[s]))
+        self.pi[s] = np.where(qs_mask, 1.0/qs_mask.sum(), 0)
+        
     def _make_deterministic(self):
         self.pi = np.eye(self.A)[np.argmax(self.pi, axis=1)]
 
@@ -65,10 +65,9 @@ class EpsilonSoftPolicy(ModelFreePolicy):
         # if there are multiple actions with the same value,
         # then we choose one of them randomly
         max_q = np.max(q[s])
-        qs_mask = q[s] == max_q
+        qs_mask = (q[s] == max_q)
         self.pi[s] = self.Ɛ/self.A
         self.pi[s, qs_mask] += (1 - self.Ɛ)/qs_mask.sum()
-
 
 
 class ModelFree:

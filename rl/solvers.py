@@ -939,7 +939,7 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
             (s_, r), end = MF.step_transition(s, a) # real next state
             q[s, a] = q[s, a] + α*(r + γ*np.max(q[s_]) - q[s, a])
             
-            times_sa[s, a] += current_t
+            times_sa[s, a] = current_t
 
             # assuming deterministic environment
             model_sas[s, a] = s_
