@@ -14,14 +14,23 @@ This repository contains code that implements algorithms and models from Sutton'
 
 The code in this repository is organized into several modules, each of which covers differents topics.
 
-# Tabular  
-## Model Based methods
+# Multi Armed Bandits
 
-...
+- [x] Epsilon Greedy
+- [x] Optimistic Initial Values
+- [x] Gradient 
+- [x] α (non stationary)
+
+# Tabular Solution Methods
+
+## Model Based methods
+- [x] Policy Evaluation
+- [x] Policy Iteration
+- [x] Value Iteration
 
 
 ## Model Free methods
-
+ 
 - [x] Monte Carlo estimation and control
   - [x] First-visit α-MC
   - [x] Every-visit α-MC  
@@ -33,7 +42,29 @@ The code in this repository is organized into several modules, each of which cov
   - [x] n-step Q-learning
   - [x] n-step Expected SARSA
   - [x] double Q learning
-       
+
+## Planning and Learning Methods
+
+- [x] Dyna-Q/Dyna-Q+
+- [x] Prioritized Sweeping
+- [ ] MCTS 
+- [ ] Trajectory Sampling
+- [ ] RTDP
+
+
+# Approximate Solution Methods
+
+- [ ] On-policy Prediction
+  - [ ] Linear SGD/semi-SGD
+  - [ ] ANN
+  - [ ] Least-Squares TD
+  - [ ] Memory-based
+  - [ ] Kernel-based
+- [ ] On-policy Control 
+  - [ ] Episodic semi-gradient
+  - [ ] Semi-gradient n-step Sarsa
+  - [ ] Differential Semi-gradient n-step Sarsa
+
 
 All solvers will work just by defining `states` `actions` and a `trasition` function. Transitions are defined as a function that takes a state and an action and returns a tuple of the next state and the reward. The transition function also returns a boolean indicating whether the episode has terminated.
 
