@@ -73,20 +73,18 @@ class EpsilonSoftPolicy(ModelFreePolicy):
 
 class ModelFree:
     '''
-    MC is an abstract class that is able to handle arbitrary
-    word transition models. 
-    
-    The interface defines just one necessary implementation
-    transition. 
+    ModelFree is the base holder of the states, actions, and 
+    the transition defining an environment.
+
+    ModelFree is used mostly internally for the seek of readability
+    on solvers, but can be used standalone as well. The usual case
+    for this is when you want to generate arbitrary episodes of a
+    specific environment. This class will stand in between of the
+    user implemented transitions and validate its correct behavior. 
     '''
 
-    def __init__(
-        self,
-        states: Sequence[Any],
-        actions: Sequence[Any],
-        transition: Callable,
-        gamma: float = 1,
-        policy: ModelFreePolicy = None,
+    def __init__(self, states: Sequence[Any], actions: Sequence[Any], 
+        transition: Callable, gamma: float = 1, policy: ModelFreePolicy = None
     ):
     
         self.policy = policy
@@ -115,9 +113,7 @@ class ModelFree:
 
         return state, action
 
-    def _transition(self, 
-        state: Any, 
-        action: Any,
+    def _transition(self, state: Any, action: Any,
         ) -> Tuple[Tuple[Any, Union[float, int]], bool]:
         
         # to help debug ill defined transitions
@@ -141,19 +137,15 @@ class ModelFree:
 
         return (s, r), end
 
-    def generate_episode(self,
-        state_0: Any, 
-        action_0: Any,
-        policy: ModelFreePolicy = None,
-        max_steps: int = MAX_STEPS
-        ) -> List[EpisodeStep]:
+    def generate_episode(self, s_0: Any, a_0: Any, max_steps: int=MAX_STEPS,  
+        policy: ModelFreePolicy = None) -> List[EpisodeStep]:
 
         policy = policy if policy else self.policy
 
         episode = []
         end = False
         step = 0
-        s_t_1, a_t_1 = state_0, action_0
+        s_t_1, a_t_1 = s_0, a_0
         while (end != True) and (step < max_steps):
             (s_t, r_t), end = self._transition(s_t_1, a_t_1)
             (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
@@ -165,11 +157,10 @@ class ModelFree:
 
         return episode
 
-    def step_transition(self, state: int, action: int):
+    def step_transition(self, state: int, action: int
+    ) -> Tuple[Tuple[int, float], bool]:
+    
         s, a = self.states.from_index(state), self.actions.from_index(action)
         (s_t, r_t), end = self._transition(s, a)
         s_new = self.states.get_index(s_t)
         return (s_new, r_t), end
-
-
-

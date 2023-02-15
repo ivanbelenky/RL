@@ -38,14 +38,13 @@ class _TabularIndexer():
         self.seq = seq
         self.N = len(seq)
         self.index = {v: i for i, v in enumerate(seq)}
-        
+        self.revindex = {i: v for i, v in enumerate(seq)}
+
     def get_index(self, v) -> Any:
         return self.index[v]
     
     def from_index(self, idx) -> Any:
-        for k, i in self.index.items():
-            if i == idx:
-                return k
+        return self.revindex[idx]
 
     def random(self, value=False):
         rnd_idx = np.random.choice(self.N)
@@ -78,19 +77,19 @@ class _TabularValues:
 
 class Vpi(_TabularValues):
     def __str__(self):
-        return f'Vpi({self.v[:10]}...)'
+        return f'Vpi({self.v[:5]}...)'
 
 class Qpi(_TabularValues):
     def __str__(self):
-        return f'Vpi({self.v[:10]}...)'
+        return f'Vpi({self.v[:5]}...)'
 
 
 VQPi = NewType('VQPi', Tuple[Vpi, Qpi, Policy])
-Samples = NewType('Samples', Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]])
+Samples = NewType('Samples', Tuple[int, List[Vpi], List[Qpi], List[Policy]])
 Transition = Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
 
 
-class RewardGenerator():
+class RewardGenerator:
     DISTRIBUTION = {
         'bernoulli': np.random.binomial,
         'gaussian': np.random.normal,
@@ -121,7 +120,6 @@ def _typecheck_transition(transition):
         raise TypeError(
             f"transition must be a Callable, not {type(transition)}")
 
-    #check that transition function has just two positional arguments
     if transition.__code__.co_argcount != 2:
         raise TypeError(
             f"transition must have two positional arguments,"

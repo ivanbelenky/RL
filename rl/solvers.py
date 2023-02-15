@@ -809,14 +809,14 @@ def n_tree_backup(states: Sequence[Any], actions: Sequence[Any], transition: Tra
     -------
     vqpi : Tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]] 
+    samples : Tuple[int, List[Vpi], List[Qpi], List[ModelFreePolicy]] 
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the TODO:.
 
     Raises
     ------
-    TransitionException: If any of the arguments is not of the correct type.
+    TransitionException: Ill defined transitions.
     '''    
     policy = _set_policy(policy, eps, actions, states)
 
@@ -911,7 +911,6 @@ def dynaq(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
         n_episodes, max_steps, sample_step)
 
     return VQPi((v, q, policy)), samples
-
 
 
 def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
