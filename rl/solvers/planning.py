@@ -7,7 +7,7 @@ from typing import (
 import numpy as np
 from numpy.linalg import norm as lnorm
 
-from mf_solvers import (
+from rl.solvers.mf_solvers import (
     get_sample, 
     _set_s0_a0,
     _set_policy,

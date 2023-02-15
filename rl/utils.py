@@ -15,7 +15,7 @@ MAX_STEPS = 1E3
 MAX_ITER = int(1E4)
 TOL = 1E-6
 MEAN_ITERS = int(1E4)
-
+W_INIT = 1E-3
 
 class Policy(ABC):
     def __init__(self):
@@ -191,3 +191,8 @@ def _check_ranges(values, ranges):
     for v, r in zip(values, ranges):
         if v < r[0] or v > r[1]:
             raise ValueError(f"{v} is out of range {r}")
+
+
+def auto_cardinal(values, n):
+    prod = np.array(np.meshgrid(*[values for _ in range(n)]))
+    return prod.T.reshape(-1, n)

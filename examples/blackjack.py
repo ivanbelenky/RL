@@ -1,6 +1,6 @@
 import random
 
-from rl.mf_solvers import (
+from rl.solvers.model_free import (
     alpha_mc,
     off_policy_mc,
     tdn
