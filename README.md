@@ -14,14 +14,15 @@ This repository contains code that implements algorithms and models from Sutton'
 
 The code in this repository is organized into several modules, each of which covers differents topics.
 
-# Multi Armed Bandits
+
+# Tabular Solution Methods
+
+## Multi Armed Bandits
 
 - [x] Epsilon Greedy
 - [x] Optimistic Initial Values
 - [x] Gradient 
 - [x] α (non stationary)
-
-# Tabular Solution Methods
 
 ## Model Based methods
 - [x] Policy Evaluation
@@ -42,13 +43,14 @@ The code in this repository is organized into several modules, each of which cov
   - [x] n-step Q-learning
   - [x] n-step Expected SARSA
   - [x] double Q learning
+  - [x] n-step Tree Backup 
 
 ## Planning and Learning Methods
 
 - [x] Dyna-Q/Dyna-Q+
 - [x] Prioritized Sweeping
-- [ ] MCTS 
 - [ ] Trajectory Sampling
+- [ ] MCTS 
 - [ ] RTDP
 
 

@@ -1,6 +1,6 @@
 import random
 
-from rl.solvers import (
+from rl.mf_solvers import (
     alpha_mc,
     off_policy_mc,
     tdn
@@ -89,5 +89,3 @@ def black_jack_transition(state, action):
 
 vqpi, samples = alpha_mc(states, actions, black_jack_transition, gamma=0.9,
     use_N=True, n_episodes=1E4, first_visit=False)
-
- 

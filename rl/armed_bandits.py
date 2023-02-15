@@ -106,10 +106,10 @@ EGREEDY = EpsilonGreedyBanditPolicy()
 class MultiArmedBandit:
     def __init__(
         self, 
-        k: int = 10, 
-        reward_generators: List[RewardGenerator] = GAUSSIAN, 
-        n_games: int = NGAMES,
-        policy: Policy = EGREEDY):
+        k: int=10, 
+        reward_generators: List[RewardGenerator]=GAUSSIAN, 
+        n_games: int=NGAMES,
+        policy: Policy=EGREEDY):
         
         self.k = k
         self.reward_generators = reward_generators

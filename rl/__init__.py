@@ -1,5 +1,5 @@
 from .model_free import ModelFree, ModelFreePolicy, EpsilonSoftPolicy, TransitionException
-from .solvers import (
+from .mf_solvers import (
     tdn, 
     alpha_mc, 
     off_policy_mc,
