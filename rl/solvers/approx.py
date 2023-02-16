@@ -82,8 +82,17 @@ class LinearApproximator(SGDWA):
     '''Linear approximator for arbitrary finite dimension state space'''
     
     def __init__(self, k: int, n: int, basis: str='poly'):
-        # (n+1)^k features when using poly basis
-        # 2n*k features when using fourier basis
+        '''
+        Parameters
+        ----------
+        k : int
+            Dimension of the state space
+        n : int
+            Order of the basis function, (n+1)^k features when using poly basis
+            2n*k features when using fourier basis.
+        basis : str
+            Basis function to use, either 'poly' or 'fourier'
+        '''
         
         self.n = n 
         self.k = k
