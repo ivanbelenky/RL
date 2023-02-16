@@ -20,7 +20,7 @@ from rl.utils import (
     Policy,
     RewardGenerator
 )
-from rl.solvers.mf_solvers import (
+from rl.solvers.model_based import (
     vq_π_iter_naive,
     policy_iteration,
     value_iteration

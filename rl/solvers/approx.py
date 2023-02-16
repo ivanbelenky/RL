@@ -1,127 +1,177 @@
 from abc import ABC, abstractclassmethod
-from typing import (
-    Union,
-    Any
-)
+from typing import Sequence, Tuple, Any
 
 import numpy as np
 from numpy.linalg import norm as lnorm
 
-from rl.model_free import (
-    ModelFree,
-    ModelFreePolicy,
-    EpsilonSoftPolicy
+from rl.model_free import ModelFree, ModelFreePolicy
+from rl.approximators import SGDWA
+from rl.solvers.model_free import (
+    get_sample,
+    _set_s0_a0,
+    _set_policy,
 )
 from rl.utils import (
-    Policy,
-    auto_cardinal,
     _typecheck_all,
     _get_sample_step,
     _check_ranges,
     VQPi,
     Samples,
     Transition,
-    Vpi,
-    Qpi,
-    PQueue,
     MAX_ITER,
     MAX_STEPS,
-    TOL,
-    W_INIT
+    TOL
 )
 
 
-'''
-All of this may change if the policy gradient methods are
-similar to this implementation. Adding probably an `optimize`
-keyword argument.
-
-SGD and Semi Gradient Linear methods:
-
-All Linear methods of this methods involve using a real value
-weight matrix/vector that will be used in conjunction with a
-basis function to approximate the value function.
-
-wt+1 = wt - 1/2 * alpha * d[(v_pi - v_pi_hat)^2]/dw
-wt+1 = wt + alpha * (v_pi - v_pi_hat)]*d[v_pi_hat]/dw
-wt+1 = wt + alpha * (U - v_pi_hat)]*d[v_pi_hat]/dw
-
-Since we dont have v_pi we have to use some estimator:
-- MC would imply grabbing full trajectories and using them
-- TD since involves bootstraping it will be a semigradient method
-
-Therefore we generate the most abstract SGD method. The two most 
-important parts of this methods is the U approximation to the real
-value, and the value function approximator, this class should be
-differentiable, or hold a gradient method.
-'''
-
-class SGDWA(ABC):
-    '''Stochastic Gradient Descent Weight-Vector Approximator
-
-    Differentiable Value Function approximator dependent
-    on a weight tensor.
+def gradient_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
+    approximator: SGDWA, state_0: Any=None, action_0: Any=None, alpha: float=0.05, 
+    gamma: float=1.0, n_episodes: int=MAX_ITER, max_steps: int=MAX_STEPS,
+    samples: int=1000,  optimize: bool=False, policy: ModelFreePolicy=None, 
+    tol: float=TOL, eps: float=None) -> Tuple[VQPi, Samples]:
+    '''
+    TODO: docs
     '''
 
-    @abstractclassmethod
-    def __call__(self, s: np.ndarray, *args, **kwargs) -> float:
-        '''Return the value of the approximation'''
-        raise NotImplementedError
+    policy = _set_policy(policy, eps, actions, states)
 
-    @abstractclassmethod
-    def grad(self, s: np.ndarray, *args, **kwargs) -> np.ndarray:
-        '''Return the gradient of the approximation'''
-        raise NotImplementedError
+    _typecheck_all(tabular_idxs=[states, actions], transition=transition,
+        constants=[gamma, alpha, n_episodes, max_steps, samples, tol],
+        booleans=[optimize], policies=[policy])
 
-    @abstractclassmethod
-    def update(self, U: float, alpha: float, s: np.ndarray):
-        return self.w + alpha * (U - self(s)) * self.grad(s)
+    _check_ranges(values=[gamma, alpha, n_episodes, max_steps, samples],
+        ranges=[(0,1), (0,1), (1,np.inf), (1,np.inf), (1,1001)])
 
+    sample_step = _get_sample_step(samples, n_episodes)
 
-class LinearApproximator(SGDWA):
-    '''Linear approximator for arbitrary finite dimension state space'''
+    model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)    
+    v, q, samples = _gradient_mc(model, approximator, state_0, action_0, 
+        alpha, n_episodes, max_steps, tol, optimize, sample_step)
+
+    return VQPi((v, q, policy)), samples
     
-    def __init__(self, k: int, n: int, basis: str='poly'):
-        '''
-        Parameters
-        ----------
-        k : int
-            Dimension of the state space
-        n : int
-            Order of the basis function, (n+1)^k features when using poly basis
-            2n*k features when using fourier basis.
-        basis : str
-            Basis function to use, either 'poly' or 'fourier'
-        '''
-        
-        self.n = n 
-        self.k = k
-        self.basis = basis
-        self.w = np.ones(n)*W_INIT
 
-        self._validate_attr()
-        self._set_basis()
+def _gradient_mc(MF, approximator, s_0, a_0, alpha, n_episodes, 
+    max_steps, tol, optimize, sample_step):
+
+    α, γ, π = alpha, MF.gamma, MF.policy
+    v, q = MF.init_vq()
+    v_hat = approximator
+
+    n_episode, samples, dnorm = 0, [], TOL*2
+    while (n_episode < n_episodes) and (dnorm > tol):
+        s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
+
+        episode = MF.generate_episode(s_0, a_0, max_steps)
+        sar = np.array(episode)
+        v_old = v.copy()
+
+        G = 0   
+        for s_t, a_t, r_tt in sar[::-1]:
+            s_t, a_t = int(s_t), int(a_t)
+            G = γ*G + r_tt
+
+            v_hat.w = v_hat.update(G, α, s_t)
+
+            #if optimize:
+            #    π.update_policy(q, s_t)
+
+            v[s_t] = v_hat(s_t)
+
+        dnorm = np.linalg.norm(v_old - v)
+        n_episode += 1
+
+        if sample_step and n_episode % sample_step == 0:
+            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+
+    return v, q, samples
+
+
+def semigrad_tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
+    approximator: SGDWA, state_0: Any=None, action_0: Any=None, alpha: float=0.05, 
+    n: int=1, gamma: float=1.0, n_episodes: int=MAX_ITER, max_steps: int=MAX_STEPS,
+    samples: int=1000,  optimize: bool=False, policy: ModelFreePolicy=None, 
+    tol: float=TOL, eps: float=None) -> Tuple[VQPi, Samples]:
+
+    policy = _set_policy(policy, eps, actions, states)
+
+    _typecheck_all(tabular_idxs=[states, actions], transition=transition,
+        constants=[gamma, alpha, n_episodes, max_steps, samples, tol, n],
+        booleans=[optimize], policies=[policy])
     
-    def _validate_attr(self):
-        if not isinstance(self.d, int):
-            raise TypeError('d must be an integer')
-        if not isinstance(self.w, np.ndarray):
-            raise TypeError('w must be a numpy array')
+    _check_ranges(values=[gamma, alpha, n_episodes, max_steps, samples, n],
+        ranges=[(0,1), (0,1), (1,np.inf), (1,np.inf), (1,1001), (1, np.inf)])
 
-    def _set_basis(self, s: np.ndarray) -> None:
-        if self.basis == 'poly':
-            n_set = np.arange(self.n+1)
-            cij = auto_cardinal(n_set, self.k)
-            def basis(s):
-                xs = [np.prod(s**cj) for cj in cij]
-                return np.array(xs)
-        if self.basis == 'fourier':
-            raise NotImplementedError
+    sample_step = _get_sample_step(samples, n_episodes)
 
-        self.basis = basis 
+    model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
+    v, q, samples = _semigrad_tdn(model, approximator, state_0, action_0,
+        alpha, n, n_episodes, max_steps, optimize, sample_step)
 
-    def grad(self, s: np.ndarray) -> np.ndarray:
-        return self.basis(s)
+    return VQPi((v, q, policy)), samples
 
-    def __call__(self, s):
-        return np.dot(self.w, self.basis(s))
+
+def _semigrad_tdn(MF, approximator, s_0, a_0, alpha, n, n_episodes, max_steps, 
+    tol, optimize, sample_step):
+    '''Semi gradient n-step temporal differnece
+
+    DRY but clear.
+    '''
+
+    α, γ, π = alpha, MF.gamma, MF.policy
+    v, q  = MF.init_vq()
+    gammatron = np.array([γ**i for i in range(n)])
+    v_hat = approximator
+
+    n_episode, samples, dnorm = 0, [], TOL*2
+    while (n_episode < n_episodes) and (dnorm > tol):
+        s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
+
+        s = MF.states.get_index(s_0)
+        a = MF.actions.get_index(a_0)
+        v_old = v.copy()
+
+        T = int(max_steps)
+        R, A, S, G = [], [a], [s], 0 
+        for t in range(T):
+            if t < T:
+                (s, r), end = MF.step_transition(s, a)
+                R.append(r)
+                S.append(s)
+                if end:
+                    T = t + 1
+                else:
+                    a = π(s)
+                    A.append(a)
+            
+            tau = t - n + 1
+            if tau >= 0:
+                rr = np.array(R[tau:min(tau+n, T)])
+                G = gammatron[:rr.shape[0]].dot(rr)
+                G_v = G # G_q = G
+                if tau + n < T:
+                    G_v = G_v + γ**n * v_hat(S[tau+n])
+                    #G_q = G_q + γ**n * q[S[tau+n], A[tau+n]]
+                
+                s_t = S[tau]
+                #a_t = A[tau]
+                
+                v_hat.w = v_hat.update(G_v, α, s_t)
+
+                v[s_t] = v_hat(s_t)
+                #q[(s_t, a_t)] = q[(s_t, a_t)] + α * (G_q - q[(s_t, a_t)])
+
+                #π.update_policy(q, s_t)
+
+            if tau == T - 1:
+                break
+
+        dnorm = np.linalg.norm(v_old - v)
+
+        if n_episode % sample_step == 0:
+            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+        n_episode += 1
+
+    return v, q, samples
+
+

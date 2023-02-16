@@ -117,11 +117,7 @@ def alpha_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transiti
     ------
     TransitionException: transition calls function checks.
     '''
-    if not policy and eps:
-        _check_ranges(values=[eps], ranges=[(0,1)])
-        policy = EpsilonSoftPolicy(actions, states, eps=eps)
-    elif not policy:
-        policy = ModelFreePolicy(actions, states)
+    policy = _set_policy(policy, eps, actions, states)
 
     _typecheck_all(tabular_idxs=[states, actions],transition=transition,
         constants=[gamma, alpha, n_episodes, max_steps, samples],
@@ -131,7 +127,6 @@ def alpha_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transiti
     _check_ranges(values=[gamma, alpha, n_episodes, max_steps, samples],
         ranges=[(0,1), (0,1), (1,np.inf), (1,np.inf), (1,1001)])
 
-        
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)    
@@ -265,13 +260,9 @@ def off_policy_mc(states: Sequence[Any], actions: Sequence[Any], transition: Tra
     ------
     TransitionException: transition calls function checks.
     '''
-    if not policy and eps:
-        _typecheck_all(constants=[eps])
-        _check_ranges(values=[eps], ranges=[(0,1)])
-        policy = EpsilonSoftPolicy(actions, states, eps=eps)
-    elif not policy:
-        policy = ModelFreePolicy(actions, states)
-    elif not b:
+    
+    policy = _set_policy(policy, eps, actions, states)
+    if not b:
         b = ModelFreePolicy(actions, states)
 
     _typecheck_all(tabular_idxs=[states, actions],transition=transition,

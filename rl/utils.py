@@ -13,7 +13,7 @@ import numpy as np
 
 MAX_STEPS = 1E3
 MAX_ITER = int(1E4)
-TOL = 1E-6
+TOL = 5E-5
 MEAN_ITERS = int(1E4)
 W_INIT = 1E-3
 
