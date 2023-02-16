@@ -369,13 +369,13 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     ----------
     states : Sequence[Any]
     actions : Sequence[Any]
+    transition : Callable[[Any,Any],[[Any,float], bool]]]
+        transition must be a callable function that takes as arguments the
+        (state, action) and returns (new_state, reward), end.
     state_0 : Any, optional
         Initial state, by default None (random)
     action_0 : Any, optional
         Initial action, by default None (random)
-    transition : Callable[[Any,Any],[[Any,float], bool]]]
-        transition must be a callable function that takes as arguments the
-        (state, action) and returns (new_state, reward), end.
     gamma : float, optional
         Discount factor, by default 0.9
     n : int, optional

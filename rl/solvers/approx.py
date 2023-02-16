@@ -30,7 +30,50 @@ def gradient_mc(states: Sequence[Any], actions: Sequence[Any], transition: Trans
     samples: int=1000,  optimize: bool=False, policy: ModelFreePolicy=None, 
     tol: float=TOL, eps: float=None) -> Tuple[VQPi, Samples]:
     '''
-    TODO: docs
+    Parameters
+    ----------
+    states : Sequence[Any]
+    actions : Sequence[Any]
+    transition : Callable[[Any,Any],[[Any,float], bool]]]
+        transition must be a callable function that takes as arguments the
+        (state, action) and returns (new_state, reward), end.
+    approximator : SGDWA
+        Function approximator to use for the state value function
+    state_0 : Any, optional
+        Initial state, by default None (random)
+    action_0 : Any, optional
+        Initial action, by default None (random)
+    alpha : float, optional
+        Learning rate, by default 0.1
+    gamma : float, optional
+        Discount factor, by default 0.9
+    n_episodes : int, optional
+        Number of episodes to simulate, by default 1E4
+    max_steps : int, optional
+        Maximum number of steps per episode, by default 1E3
+    samples : int, optional
+        Number of samples to take, by default 1000
+    optimize : bool, optional
+        Whether to optimize the policy or not, by default False
+    policy : ModelFreePolicy, optional
+        Policy to use, by default equal probability ModelFreePolicy
+    tol : float, optional
+        Tolerance for estimating convergence estimations
+    eps : float, optional
+        Epsilon value for the epsilon-soft policy, by default None (no exploration)
+    
+    Returns
+    -------
+    vqpi : Tuple[VPi, QPi, Policy]
+        Value function, action-value function, policy and samples if any.
+    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]] 
+        Samples taken during the simulation if any. The first element is the
+        index of the iteration, the second is the value function, the third is
+        the action-value function and the fourth is the TODO:.
+
+    Raises
+    ------
+    TransitionError: If any of the arguments is not of the correct type.
     '''
 
     policy = _set_policy(policy, eps, actions, states)
@@ -92,7 +135,59 @@ def semigrad_tdn(states: Sequence[Any], actions: Sequence[Any], transition: Tran
     n: int=1, gamma: float=1.0, n_episodes: int=MAX_ITER, max_steps: int=MAX_STEPS,
     samples: int=1000,  optimize: bool=False, policy: ModelFreePolicy=None, 
     tol: float=TOL, eps: float=None) -> Tuple[VQPi, Samples]:
+    '''Semi-Gradient n-step Temporal Difference
+    
+    Solver for the n-step temporal difference algorithm. The algorithm is
+    semi-gradient in the sense that it uses a function approximator to
+    estimate the _true_ value function. 
 
+    Parameters
+    ----------
+    states : Sequence[Any]
+    actions : Sequence[Any]
+    transition : Callable[[Any,Any],[[Any,float], bool]]]
+        transition must be a callable function that takes as arguments the
+        (state, action) and returns (new_state, reward), end.
+    approximator : SGDWA
+        Function approximator to use for the state value function
+    state_0 : Any, optional
+        Initial state, by default None (random)
+    action_0 : Any, optional
+        Initial action, by default None (random)
+    alpha : float, optional
+        Learning rate, by default 0.1
+    n : int, optional
+        Number of steps to look ahead, by default 1
+    gamma : float, optional
+        Discount factor, by default 0.9
+    n_episodes : int, optional
+        Number of episodes to simulate, by default 1E4
+    max_steps : int, optional
+        Maximum number of steps per episode, by default 1E3
+    samples : int, optional
+        Number of samples to take, by default 1000
+    optimize : bool, optional
+        Whether to optimize the policy or not, by default False
+    policy : ModelFreePolicy, optional
+        Policy to use, by default equal probability ModelFreePolicy
+    tol : float, optional
+        Tolerance for estimating convergence estimations
+    eps : float, optional
+        Epsilon value for the epsilon-soft policy, by default None (no exploration)
+    
+    Returns
+    -------
+    vqpi : Tuple[VPi, QPi, Policy]
+        Value function, action-value function, policy and samples if any.
+    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]] 
+        Samples taken during the simulation if any. The first element is the
+        index of the iteration, the second is the value function, the third is
+        the action-value function and the fourth is the TODO:.
+
+    Raises
+    ------
+    TransitionError: If any of the arguments is not of the correct type.
+    '''
     policy = _set_policy(policy, eps, actions, states)
 
     _typecheck_all(tabular_idxs=[states, actions], transition=transition,
@@ -160,7 +255,6 @@ def _semigrad_tdn(MF, approximator, s_0, a_0, alpha, n, n_episodes, max_steps,
 
                 v[s_t] = v_hat(s_t)
                 #q[(s_t, a_t)] = q[(s_t, a_t)] + α * (G_q - q[(s_t, a_t)])
-
                 #π.update_policy(q, s_t)
 
             if tau == T - 1:
@@ -173,5 +267,3 @@ def _semigrad_tdn(MF, approximator, s_0, a_0, alpha, n, n_episodes, max_steps,
         n_episode += 1
 
     return v, q, samples
-
-

@@ -99,7 +99,7 @@ def single_state_transition(state, action):
         else:
             return (state, 0), False
 
-b = ModelFreePolicy(actions, states) #by default 1 half
+b = ModelFreePolicy(actions, states) #by default equiprobable
 pi = ModelFreePolicy(actions, states)
 pi.pi[0] = np.array([1, 0])
 
