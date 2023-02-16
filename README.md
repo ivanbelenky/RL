@@ -57,7 +57,7 @@ The code in this repository is organized into several modules, each of which cov
 # Approximate Solution Methods
 
 - [ ] On-policy Prediction
-  - [ ] Linear SGD/semi-SGD
+  - [x] Linear SGD/semi-SGD
   - [ ] ANN
   - [ ] Least-Squares TD
   - [ ] Memory-based
