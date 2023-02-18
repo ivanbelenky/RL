@@ -251,7 +251,7 @@ def _t_sampling(MF, s_0, a_0, n_episodes, optimize,
             n_sas[s, a, s_] += 1
             model_sar[s, a, s_] = r # assumes deterministic reward
 
-            # p_sas is the probability of transitioning from
+            # p_sas is the probability of transitioning from s to s'
             p_sas = n_sas[s,a]/np.sum(n_sas[s, a]) 
             next_s_mask = np.where(p_sas)[0]
             max_q = np.max(q[next_s_mask, :], axis=1)
@@ -260,14 +260,14 @@ def _t_sampling(MF, s_0, a_0, n_episodes, optimize,
             
             q[s, a] = np.dot(p_ns, r_ns + γ*max_q)
 
-            a_ = np.argmax(q[s_])
+            π.update_policy(q, s)
+            a_ = π(s_)
+
+            s = s_
 
             if end:
                 break
 
-        if optimize:
-            # TODO: optimize trajectory sampling methods
-            pass
 
         if n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
