@@ -49,7 +49,7 @@ The code in this repository is organized into several modules, each of which cov
 
 - [x] Dyna-Q/Dyna-Q+
 - [x] Prioritized Sweeping
-- [ ] Trajectory Sampling
+- [x] Trajectory Sampling
 - [ ] MCTS 
 - [ ] RTDP
 
