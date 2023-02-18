@@ -129,7 +129,7 @@ class RewardGenerator:
 
 def _typecheck_tabular_idxs(*args):
     for arg in args:
-        if not isinstance(arg, Sequence):
+        if not isinstance(arg, (Sequence, np.ndarray)):
             raise TypeError(
                 f"Tabular Indexes must be Sequence, not {type(arg)}")
     

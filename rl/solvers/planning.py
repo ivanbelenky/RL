@@ -125,7 +125,7 @@ def priosweep(states: Sequence[Any], actions: Sequence[Any], transition: Transit
     '''
     policy = _set_policy(policy, eps, actions, states)
 
-    _typecheck_all(tabular_idxs=[states,actions], transition=transition,
+    _typecheck_all(tabular_idxs=[states, actions], transition=transition,
         constants=[gamma, theta, n, alpha, n_episodes, samples, max_steps], 
         booleans=[plus], policies=[policy])
 
@@ -204,8 +204,77 @@ def _priosweep(MF, s_0, a_0, n, alpha, theta, n_episodes, max_steps,
     return v, q, samples
 
 
-def t_sampling():
-    raise NotImplementedError
+def t_sampling(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
+    state_0: Any=None, action_0: Any=None, gamma: float=1.0,
+    n_episodes: int=MAX_ITER, policy: ModelFreePolicy=None, eps: float=None, 
+    samples: int=1000, optimize: bool=False, max_steps: int=MAX_STEPS
+    ) -> Tuple[VQPi, Samples]:
+    '''
+    TODO: docs
+    '''
+    policy = _set_policy(policy, eps, actions, states)
+
+    _typecheck_all(tabular_idxs=[states,actions], transition=transition,
+        constants=[gamma, n_episodes, samples, max_steps], 
+        booleans=[optimize], policies=[policy])
+
+    # TODO: check ranges
+    
+    sample_step = _get_sample_step(samples, n_episodes)
+
+    model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
+    v, q, samples = _t_sampling(model, state_0, action_0, n_episodes,
+        optimize, max_steps, sample_step)
+
+    return VQPi((v, q, policy)), samples
+
+
+def _t_sampling(MF, s_0, a_0, n_episodes, optimize, 
+    max_steps, sample_step):
+    
+    π, γ = MF.policy, MF.gamma
+    v, q = MF.init_vq()
+    
+    S, A = MF.states.N, MF.actions.N
+    n_sas = np.zeros((S, A, S), dtype=int) # p(s'|s,a) 
+    model_sar = np.zeros((S, A, S), dtype=float) # r(s,a,s') deterministic reward
+
+    samples, n_episode = [], 0
+    while n_episode < n_episodes:
+        s, a = _set_s0_a0(MF, s_0, a_0)
+        a_ = MF.actions.get_index(a)
+        s = MF.states.get_index(s)
+        
+        for _ in range(int(max_steps)):
+            (s_, r), end = MF.step_transition(s, a_) # real next state
+            
+            n_sas[s, a, s_] += 1
+            model_sar[s, a, s_] = r # assumes deterministic reward
+
+            # p_sas is the probability of transitioning from
+            p_sas = n_sas[s,a]/np.sum(n_sas[s, a]) 
+            next_s_mask = np.where(p_sas)[0]
+            max_q = np.max(q[next_s_mask, :], axis=1)
+            r_ns = model_sar[s, a, next_s_mask]
+            p_ns = p_sas[next_s_mask]
+            
+            q[s, a] = np.dot(p_ns, r_ns + γ*max_q)
+
+            a_ = np.argmax(q[s_])
+
+            if end:
+                break
+
+        if optimize:
+            # TODO: optimize trajectory sampling methods
+            pass
+
+        if n_episode % sample_step == 0:
+            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+
+        n_episode += 1
+    
+    return v, q, samples
 
 
 def rtdp():
