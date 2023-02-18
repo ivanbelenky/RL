@@ -136,8 +136,8 @@ class ModelFree:
 
         return (s, r), end
 
-    def generate_episode(self, s_0: Any, a_0: Any, max_steps: int=MAX_STEPS,  
-        policy: ModelFreePolicy = None) -> List[EpisodeStep]:
+    def generate_episode(self, s_0: Any, a_0: Any, policy: ModelFreePolicy = None, 
+        max_steps: int=MAX_STEPS) -> List[EpisodeStep]:
 
         policy = policy if policy else self.policy
 
