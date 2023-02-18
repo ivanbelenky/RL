@@ -14,14 +14,9 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from rl.utils import (
-    State,
-    Action,
-    Policy,
-    RewardGenerator
-)
+from rl.utils import Policy, RewardGenerator
 from rl.solvers.model_based import (
-    vq_π_iter_naive,
+    vq_pi_iter_naive,
     policy_iteration,
     value_iteration
 )
@@ -151,7 +146,7 @@ class MarkovPolicy(Policy):
 
 class MDP:
     VQ_PI_SOLVERS = {
-        'iter_n': vq_π_iter_naive
+        'iter_n': vq_pi_iter_naive
     }
 
     OPTIMAL_POLICY_SOLVERS = {

@@ -5,7 +5,7 @@ from .model_free import (
     TransitionException
 )
 from .solvers.model_based import (
-    vq_π_iter_naive, 
+    vq_pi_iter_naive, 
     value_iteration, 
     policy_iteration
 )
@@ -30,7 +30,7 @@ __all__ = [
     'ModelFreePolicy',
     'EpsilonSoftPolicy',
     'TransitionException',
-    'vq_π_iter_naive',
+    'vq_pi_iter_naive',
     'value_iteration',
     'policy_iteration',
     'alpha_mc',

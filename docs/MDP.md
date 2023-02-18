@@ -21,7 +21,7 @@ The `MDP` class represents an MDP and provides methods for solving it. It has a 
 
 ### `Solvers`
 
-The code includes a number of solver functions for computing the value function and optimize policies for an MDP, including `vq_π_iter_naive`, `policy_iteration`, and `value_iteration`. These solvers can be used with the `MDP` class's `value_function()` and `optimal_policy()` methods to solve an MDP.
+The code includes a number of solver functions for computing the value function and optimize policies for an MDP, including `vq_pi_iter_naive`, `policy_iteration`, and `value_iteration`. These solvers can be used with the `MDP` class's `value_function()` and `optimal_policy()` methods to solve an MDP.
 
 <br>
 
