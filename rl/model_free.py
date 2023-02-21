@@ -95,6 +95,8 @@ class ModelFree:
         self.gamma = gamma
         self.policy = policy if policy else ModelFreePolicy(
             self.actions.N, self.states.N)
+
+        self._validate_transition()
   
     def init_vq(self):
         v = np.zeros(self.states.N) 
@@ -112,10 +114,27 @@ class ModelFree:
 
         return state, action
 
-    def _transition(self, state: Any, action: Any,
+    def _validate_transition(self):
+        states = self.states.seq
+        actions = self.actions.seq
+        sa = [(s,a) for s in states for a in actions]
+        
+        success, fail_count = True, 0
+        for s, a in sa:
+            try:
+                self.__validate_transition(s, a)
+            except Exception as e:
+                success = False
+                fail_count += 1
+                print(f"Warning: {e}") # TODO: change to logger
+                
+        if not success:
+            raise TransitionException(
+                f"Transition failed for {fail_count} state-action pairs")
+
+    def __validate_transition(self, state: Any, action: Any,
         ) -> Tuple[Tuple[Any, Union[float, int]], bool]:
         
-        # to help debug ill defined transitions
         try:
             (s, r), end = self.transition(state, action)
         except Exception as e:
@@ -146,7 +165,7 @@ class ModelFree:
         step = 0
         s_t_1, a_t_1 = s_0, a_0
         while (end != True) and (step < max_steps):
-            (s_t, r_t), end = self._transition(s_t_1, a_t_1)
+            (s_t, r_t), end = self.transition(s_t_1, a_t_1)
             (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
             episode.append((_s, _a, _r))
             a_t = policy(self.states.get_index(s_t))
@@ -160,6 +179,6 @@ class ModelFree:
     ) -> Tuple[Tuple[int, float], bool]:
     
         s, a = self.states.from_index(state), self.actions.from_index(action)
-        (s_t, r_t), end = self._transition(s, a)
+        (s_t, r_t), end = self.transition(s, a)
         s_new = self.states.get_index(s_t)
         return (s_new, r_t), end
