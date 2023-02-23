@@ -4,6 +4,7 @@ from typing import (
     Any
 )
 
+from tqdm import tqdm
 import numpy as np
 from numpy.linalg import norm as lnorm
 
@@ -54,7 +55,7 @@ def dynaq(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
     v, q, samples = _dyna_q(model, state_0, action_0, n, alpha, kappa, plus,
-        n_episodes, max_steps, sample_step)
+        int(n_episodes), max_steps, sample_step)
 
     return VQPi((v, q, policy)), samples
 
@@ -73,8 +74,7 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
 
     samples = []
     current_t = 0
-    n_episode = 0
-    while n_episode < n_episodes:
+    for n_episode in tqdm(range(n_episodes), desc='Dyna-Q', unit='episodes'):
         s_0, _ = _set_s0_a0(MF, s_0, None)
 
         s = MF.states.get_index(s_0)
@@ -110,7 +110,6 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps,
         
         if n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, True))
-        n_episode += 1
 
     return v, q, samples
 
@@ -135,7 +134,7 @@ def priosweep(states: Sequence[Any], actions: Sequence[Any], transition: Transit
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
     v, q, samples = _priosweep(model, state_0, action_0, n, alpha, theta, 
-        n_episodes, max_steps, sample_step)
+        int(n_episodes), max_steps, sample_step)
 
     return VQPi((v, q, policy)), samples
 
@@ -153,8 +152,8 @@ def _priosweep(MF, s_0, a_0, n, alpha, theta, n_episodes, max_steps,
     model_sar = np.zeros((S, A), dtype=float)
     times_sa = np.zeros((S, A), dtype=int)
 
-    samples, current_t, n_episode = [], 0, 0
-    while n_episode < n_episodes:
+    samples, current_t = [], 0
+    for n_episode in tqdm(range(n_episodes), desc='priosweep', unit='episodes'):
         s_0, _ = _set_s0_a0(MF, s_0, None)
 
         s = MF.states.get_index(s_0)
@@ -199,7 +198,6 @@ def _priosweep(MF, s_0, a_0, n, alpha, theta, n_episodes, max_steps,
         
         if n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, True))
-        n_episode += 1
 
     return v, q, samples
 
@@ -223,7 +221,7 @@ def t_sampling(states: Sequence[Any], actions: Sequence[Any], transition: Transi
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
-    v, q, samples = _t_sampling(model, state_0, action_0, n_episodes,
+    v, q, samples = _t_sampling(model, state_0, action_0, int(n_episodes),
         optimize, max_steps, sample_step)
 
     return VQPi((v, q, policy)), samples
@@ -239,8 +237,8 @@ def _t_sampling(MF, s_0, a_0, n_episodes, optimize,
     n_sas = np.zeros((S, A, S), dtype=int) # p(s'|s,a) 
     model_sar = np.zeros((S, A, S), dtype=float) # r(s,a,s') deterministic reward
 
-    samples, n_episode = [], 0
-    while n_episode < n_episodes:
+    samples = []
+    for n_episode in tqdm(range(n_episodes), desc='Trajectory Sampling', unit='episodes'):
         s, a = _set_s0_a0(MF, s_0, a_0)
         a_ = MF.actions.get_index(a)
         s = MF.states.get_index(s)
@@ -262,17 +260,13 @@ def _t_sampling(MF, s_0, a_0, n_episodes, optimize,
 
             π.update_policy(q, s)
             a_ = π(s_)
-
             s = s_
 
             if end:
                 break
 
-
         if n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
-
-        n_episode += 1
     
     return v, q, samples
 

@@ -8,6 +8,7 @@ from typing import (
     Any
 )
 
+from tqdm import tqdm
 import numpy as np
 from numpy.linalg import norm as lnorm
 
@@ -131,7 +132,7 @@ def alpha_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transiti
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)    
     v, q, samples = _visit_monte_carlo(model, first_visit, exploring_starts, use_N,
-        alpha, n_episodes, max_steps, optimize, sample_step) 
+        alpha, int(n_episodes), max_steps, optimize, sample_step) 
 
     return VQPi((v, q, model.policy.pi)), samples
 
@@ -177,8 +178,7 @@ def _visit_monte_carlo(MF, first_visit, exploring_starts, use_N, alpha,
 
     s_0, a_0 = MF.random_sa(value=True)
 
-    n_episode = 0
-    while n_episode < n_episodes:
+    for n_episode in tqdm(range(n_episodes), desc='Monte Carlo', unit='episodes'):
         if exploring_starts:
             s_0, a_0 = MF.random_sa(value=True)
 
@@ -198,8 +198,6 @@ def _visit_monte_carlo(MF, first_visit, exploring_starts, use_N, alpha,
                     α, G, first_visit)
             if optimize and update:
                 π.update_policy(q, s_t)
-
-        n_episode += 1
 
         if sample_step and n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
@@ -275,7 +273,7 @@ def off_policy_mc(states: Sequence[Any], actions: Sequence[Any], transition: Tra
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)    
-    v, q, samples = _off_policy_monte_carlo(model, b, n_episodes, 
+    v, q, samples = _off_policy_monte_carlo(model, b, int(n_episodes), 
         max_steps, first_visit, ordinary, optimize, sample_step)
 
     return VQPi((v, q, policy)), samples
@@ -317,12 +315,10 @@ def _off_policy_monte_carlo(MF, off_policy, n_episodes, max_steps, first_visit,
 
     samples = []
 
-    n_episode = 0
-
     v, q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
     c, c_q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
 
-    while n_episode < n_episodes:
+    for n_episode in tqdm(range(int(n_episodes)), desc='Off-policy MC', unit='episodes'):
         G = 0.
         s_0, a_0 = MF.random_sa(value=True)
         episode = MF.generate_episode(s_0, a_0, b, max_steps)
@@ -346,8 +342,6 @@ def _off_policy_monte_carlo(MF, off_policy, n_episodes, max_steps, first_visit,
             if update and optimize:
                 π.update_policy(q, s_t) 
         
-        n_episode += 1
-
         if sample_step and n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
     
@@ -447,7 +441,7 @@ def tdn(states: Sequence[Any], actions: Sequence[Any], transition: Transition,
     
     _tdn = METHOD_MAP[method]
 
-    v, q, samples = _tdn(model, state_0, action_0, n, alpha, n_episodes,
+    v, q, samples = _tdn(model, state_0, action_0, n, alpha, int(n_episodes),
         max_steps, optimize, method, sample_step)
     
     return VQPi((v, q, policy)), samples
@@ -519,8 +513,7 @@ def _tdn_onoff(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     f_step = STEP_MAP[method]
 
     samples = []
-    n_episode = 0
-    while n_episode < n_episodes:
+    for n_episode in tqdm(range(n_episodes), desc=f'td({n-1})', unit='episode'):
         if not s_0:
            s_0, _ = MF.random_sa(value=True) 
         if not a_0:
@@ -543,8 +536,6 @@ def _tdn_onoff(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
                 # off policy without importance weighting
                 π.update_policy(q, s[t]) 
         
-        n_episode += 1
-
         if sample_step and n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
     
@@ -576,8 +567,7 @@ def _double_q(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     v, q = MF.init_vq()
 
     samples = []
-    n_episode = 0
-    while n_episode < n_episodes:
+    for n_episode in tqdm(range(n_episodes)):
         s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
         episode = MF.generate_episode(s_0, a_0, π, max_steps)
         
@@ -600,8 +590,6 @@ def _double_q(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
             if optimize:  
                 π.update_policy(q, s[t])
         
-        n_episode += 1
-
         if sample_step and n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
     
@@ -621,8 +609,7 @@ def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
     v, q = MF.init_vq()
 
     samples = []
-    n_episode = 0
-    while n_episode < n_episodes:
+    for n_episode in tqdm(range(n_episodes), desc=f'td({n-1}) variant', unit='episode'):
         s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
 
         s = MF.states.get_index(s_0)
@@ -661,7 +648,6 @@ def _tdn_on(MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize,
 
         if n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
-        n_episode += 1
 
     return v, q, samples
 
@@ -741,7 +727,7 @@ def n_tree_backup(states: Sequence[Any], actions: Sequence[Any], transition: Tra
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)  
     
-    v, q, samples = _n_tree_backup(model, state_0, action_0, n, alpha, n_episodes,
+    v, q, samples = _n_tree_backup(model, state_0, action_0, n, alpha, int(n_episodes),
         max_steps, optimize, sample_step)
     
     return VQPi((v, q, policy)), samples
@@ -755,8 +741,8 @@ def _n_tree_backup(MF, s_0, a_0, n, alpha, n_episodes, max_steps,
     v, q = MF.init_vq()
 
     samples = []
-    n_episode = 0
-    while n_episode < n_episodes:
+    
+    for n_episode in tqdm(range(n_episodes), desc=f'{n}-Tree Backup', unit='episodes'):
         s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
 
         s = MF.states.get_index(s_0)
@@ -796,6 +782,5 @@ def _n_tree_backup(MF, s_0, a_0, n, alpha, n_episodes, max_steps,
 
         if n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
-        n_episode += 1
 
     return v, q, samples
