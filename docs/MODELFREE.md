@@ -270,6 +270,42 @@ As a final remark is worth noting that there exists two other algorithms in the 
 
 <br/>
 
+
+
+
+## Monte Carlo Tree Search MCTS
+
+MCTS is a Monte Carlo method used in planning and decision making. It balances the exploitation exploration issue. It can succeed even with little domain knowledge. 
+
+The basic implementation is very simple. 
+- A tree is built in an incremental and asymmetric manner. 
+- For each iteration a _tree policy_ is used to find best node to expand. This is the policy that tries to balance exploration and exploitation. 
+-  Simulation is then run from the leaf node that was selected, and the node is updated accoridng to the result of this simulation (i.e. the reward and backpropagate statistics). There exists a _default policy_ specifies how to simulate from a given state. It can be really simple, uniform for instance.
+
+
+2012 literature review paper quote:
+
+_However, it is really the success in computer Go, through the recursive application of Monte Carlo methods during the tree-building process, which has been responsible for much of the interest in MCTS. This is because Go is one of the few classic games for which human players are so far ahead of computer players. MCTS has had a dramatic effect on narrowing this gap, and is now competitive with the very best human players on small boards, though MCTS falls far short of their level on the standard 19⇥19 board._ 
+
+4 years later in 2016, MCTS was able to beat the world champion of Go, Lee Sedol.
+
+The algorithm consists as already stated on building a search tree until some predefined constraint has been reached. 
+
+- Selection: from the root node, a child is selected by recursively applying a tree policy. If a nonterminal state that has not yet been visited is encountered. We halt.
+- Expansion: one (or more) child nodes are created and expand the tree, according to the available actions.
+- Simulation: a simulation is run from the expanded node, using a default policy to produce an outcome.
+- Backpropagation: through the selected nodes the statistics are updated.
+
+- _Tree Policy_: select/create leaf nodes to expand the tree. Selection and expansion.
+- _Default Policy_: play out the domain from a given non-terminal state. 
+
+Finite Horizon, finite size MDPs, based on random episode sampling structured as a decision tree. There exists some requisites that are listed below for MCTS use.
+
+- state-action space must be finite
+- MDP must be finite horizon
+- MDP must be undiscounted i.e. $\color{orange}\gamma = 1$. 
+
+
 <br>
 <br>
 
