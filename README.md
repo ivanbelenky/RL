@@ -111,6 +111,26 @@ vqpi_w, samples_w = off_policy_mc(states, actions, single_state_transition,
 
 ![](https://github.com/ivanbelenky/RL/blob/master/assets/images/ordinary_vs_weighted.png)
 
+
+Monte carlo tree search with some cute graphics right?
+
+```python
+s = START_XY
+budget = 500
+cp = 1/np.sqrt(2)
+end = False
+max_steps = 50
+while not end:
+    action, tree = mcts(s, cp, budget, obstacle_maze, action_map, max_steps, eps=1)
+    (s, _), end = obstacle_maze(s, action)
+
+tree.plot()
+```
+
+![](https://github.com/RL/blob/master/assets/images/mcts.png)
+
+<br>
+
 # Contributing
 
 While the code in this package provides a basic implementation of the algorithms from the book, it is not necessarily the most efficient or well-written. If you have suggestions for improving the code, please feel free to open an issue.

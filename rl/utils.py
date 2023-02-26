@@ -9,7 +9,9 @@ from typing import (
 )
 
 import numpy as np
+import matplotlib.pyplot as plt
 
+plt.style.use("dark_background")
 
 MAX_STEPS = 1E3
 MAX_ITER = int(1E4)
@@ -151,6 +153,46 @@ class UCTree:
         self.Cp = Cp
         self.max_steps = max_steps
         self.nodes = {} if not nodes else nodes
+
+    def max_depth(self):
+        stack = [(self.root, 0)]
+        max_depth = 0
+        while stack:
+            node, depth = stack.pop()
+            max_depth = max(depth, max_depth)
+            for child in node.children.values():
+                stack.append((child, depth+1))
+        return max_depth
+
+    def plot(self):
+        max_depth = self.max_depth()
+        width = 4*max_depth
+        height = max_depth
+        stack = [(self.root, 0, 0, width)]
+        treenodes = []
+        lines = []
+        while stack:
+            node, depth, x, step = stack.pop()
+            node_pos = (x + step/2, height-depth)
+            treenodes.append(node_pos)
+            if node.children:
+                n_childs = len(node.children)
+                step = step/n_childs
+                for i, child in enumerate(node.children.values()):
+                    stack.append((child, depth+1, x+i*step, step))
+                    lines.append((node_pos, (step/2 + x+i*step, height-depth-1)))
+        
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot(111)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for node in treenodes:
+            ax.scatter(node[0], node[1], color='white', s=1)
+        for line in lines:
+            ax.plot([line[0][0], line[1][0]], 
+                    [line[0][1], line[1][1]], 
+                    color='white', linewidth=0.5)
+        plt.show()
 
 
 def _typecheck_tabular_idxs(*args):

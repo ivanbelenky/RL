@@ -289,13 +289,15 @@ def _expand(v, transition, actions):
     return v_prime
 
 
-def _tree_policy(tree, Cp, transition, action_map):
+def _tree_policy(tree, Cp, transition, action_map, eps):
     v = tree.root
     while not v.is_terminal:
         actions = action_map(v.state)
         took_actions = v.children.keys()
         unexplored = set(actions) - set(took_actions)
-        if unexplored:
+        if not took_actions:
+            return _expand(v, transition, actions)
+        if unexplored and np.random.rand() < eps:
             return _expand(v, transition, unexplored)
         v = _best_child(v, Cp)
     return v
@@ -312,8 +314,9 @@ def _default_policy(v_leaf, transition, action_map, max_steps):
         actions = action_map(s)
         a = np.random.choice(actions)
         (s, _r), end = transition(s, a)
+        r += _r
         if end:
-            return _r
+            return 1
         step += 1
     return -1
         
@@ -326,8 +329,8 @@ def _backup(v_leaf, delta):
         v = v.parent
 
 
-def mcts(s0, Cp, budget, transition, action_map, max_steps, verbose=True, 
-        tree=None):
+def mcts(s0, Cp, budget, transition, action_map, max_steps, tree=None,
+    eps=1, verbose=True):
     '''
     Effectively implementing the UCT search algorithm
     '''
@@ -335,7 +338,7 @@ def mcts(s0, Cp, budget, transition, action_map, max_steps, verbose=True,
     if not tree:
         tree = UCTree(s, Cp)
     for _ in tqdm(range(budget), disable=not verbose):
-        v_leaf = _tree_policy(tree, Cp, transition, action_map)
+        v_leaf = _tree_policy(tree, Cp, transition, action_map, eps)
         delta = _default_policy(v_leaf, transition, action_map, max_steps)
         _backup(v_leaf, delta)
         
