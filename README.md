@@ -74,7 +74,7 @@ actions: Sequence[Any]
 transtion: Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
 ```
 
-### Examples 
+# Examples 
 
 **Single State Infinite Variance Example 5.5**
 
@@ -111,8 +111,9 @@ vqpi_w, samples_w = off_policy_mc(states, actions, single_state_transition,
 
 ![](https://github.com/ivanbelenky/RL/blob/master/assets/images/ordinary_vs_weighted.png)
 
+<br>
 
-Monte carlo tree search with some cute graphics right?
+**Monte Carlo Tree Search maze solving plot**
 
 ```python
 s = START_XY
