@@ -127,7 +127,7 @@ while not end:
 tree.plot()
 ```
 
-![](https://github.com/RL/blob/master/assets/images/mcts.png)
+![](https://github.com/ivanbelenky/RL/blob/master/assets/images/mcts.png)
 
 <br>
 
