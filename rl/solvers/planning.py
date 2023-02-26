@@ -13,13 +13,10 @@ from rl.solvers.model_free import (
     _set_s0_a0,
     _set_policy,
 )
-from rl.model_free import (
-    ModelFree,
-    ModelFreePolicy,
-    EpsilonSoftPolicy
-)
+from rl.model_free import ModelFree, ModelFreePolicy
 from rl.utils import (
-    Policy,
+    UCTree,
+    UCTNode,
     _typecheck_all,
     _get_sample_step,
     _check_ranges,
@@ -275,5 +272,72 @@ def rtdp():
     raise NotImplementedError
 
 
-def mcts():
-    raise NotImplementedError
+
+def _best_child(v, Cp):
+    actions = np.array(list(v.children.keys()))
+    qs = np.array([v.children[a].q for a in actions])
+    ns = np.array([v.children[a].n for a in actions])
+    ucb = qs/ns + Cp*np.sqrt(np.log(v.n)/ns)
+    return v.children[actions[np.argmax(ucb)]]
+    
+
+def _expand(v, transition, actions):
+    a = np.random.choice(list(actions))
+    (s_, _), end =  transition(v.state, a)
+    v_prime = UCTNode(s_, a, 0, 1, v, end)
+    v.children[a] = v_prime
+    return v_prime
+
+
+def _tree_policy(tree, Cp, transition, action_map, eps):
+    v = tree.root
+    while not v.is_terminal:
+        actions = action_map(v.state)
+        took_actions = v.children.keys()
+        unexplored = set(actions) - set(took_actions)
+        if unexplored:
+            return _expand(v, transition, unexplored)
+        v = _best_child(v, Cp)
+    return v
+
+
+def _default_policy(v_leaf, transition, action_map, max_steps):
+    step, r = 0, 0
+    s = v_leaf.state
+
+    if v_leaf.is_terminal:
+        return r
+
+    while step < max_steps:
+        actions = action_map(s)
+        a = np.random.choice(actions)
+        (s, _r), end = transition(s, a)
+        r += _r
+        if end:
+            return r
+        step += 1
+    return r
+        
+
+def _backup(v_leaf, delta):
+    v = v_leaf
+    while not v:
+        v.n += 1
+        v.q += delta
+        v = v.parent
+
+
+def mcts(s0, Cp, budget, transition, action_map, max_steps, eps=0.1, tree=None):
+    '''
+    Effectively implementing the UCT search algorithm
+    '''
+    s = s0
+    if not tree:
+        tree = UCTree(s, Cp)
+    for _ in tqdm(range(budget)):
+        v_leaf = _tree_policy(tree, Cp, transition, action_map, eps=eps)
+        delta = _default_policy(v_leaf, transition, action_map, max_steps)
+        _backup(v_leaf, delta)
+        
+    v_best = _best_child(tree.root, 0)
+    return v_best.action, UCTree(v_best)

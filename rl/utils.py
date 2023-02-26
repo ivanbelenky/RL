@@ -33,7 +33,7 @@ class Policy(ABC):
 
 class _TabularIndexer():
     '''
-        Simple proxy for tabular state & actions.
+    Simple proxy for tabular state & actions.
     '''
     def __init__(self, seq: Sequence[Any]):
         self.seq = seq
@@ -125,6 +125,32 @@ class RewardGenerator:
         if not generator:
             raise ValueError(f'Invalid distribution: {distribution}')
         return generator(*args, **kwargs)
+
+
+class UCTNode:
+    def __init__(self, state, action, q, n, parent=None, is_terminal=False):
+        self.state = state
+        self.action = action
+        self.q = q
+        self.n = n
+        self.parent = parent
+        self.children = {}
+        self.is_terminal = False
+    
+    def add_child(self, child):
+        self.children[child.action] = child
+        return child
+
+
+class UCTree:
+    def __init__(self, root, Cp=1.0, max_steps=MAX_STEPS, nodes=None):
+        if not isinstance(root, UCTNode):
+            self.root = UCTNode(root, None, 0, 1, None)
+        else:
+            self.root = root
+        self.Cp = Cp
+        self.max_steps = max_steps
+        self.nodes = {} if not nodes else nodes
 
 
 def _typecheck_tabular_idxs(*args):
