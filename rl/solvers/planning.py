@@ -337,7 +337,7 @@ def mcts(s0, Cp, budget, transition, action_map, max_steps, tree=None,
     s = s0
     if not tree:
         tree = UCTree(s, Cp)
-    for _ in tqdm(range(budget), disable=not verbose):
+    for _ in tqdm(range(budget), desc='MCTS', disable=not verbose):
         v_leaf = _tree_policy(tree, Cp, transition, action_map, eps)
         delta = _default_policy(v_leaf, transition, action_map, max_steps)
         _backup(v_leaf, delta)
