@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import warnings
 from typing import (
     Any, 
     Sequence, 
@@ -262,6 +263,53 @@ def _check_ranges(values, ranges):
             raise ValueError(f"{v} is out of range {r}")
 
 
-def auto_cardinal(values, n):
+def auto_cardinal(values, n, safe=True):
+    if (n+1)**len(values) > 2.5E6:
+        if safe:
+            raise ValueError("Too many combinations, may cause memory error,"
+                             "set safe=False to avoid raising this error")
+        else:
+            warnings.warn("Too many combinations, may cause memory error")
     prod = np.array(np.meshgrid(*[values for _ in range(n)]))
     return prod.T.reshape(-1, n)
+
+
+class BasisException(Exception):
+    pass
+
+
+def get_basis(self, basis, cij) -> Callable[[np.ndarray], np.ndarray]:
+    '''get basis function for linear approximator using polynomial or
+    fourier base
+
+    Parameters
+    ----------
+    basis : str
+        Basis function to use, either 'poly' or 'fourier'
+    cij : np.ndarray
+        Coefficients for the basis function
+    
+    Returns
+    -------
+    basis: Callable[[np.ndarray], np.ndarray]
+        This function will not work on arbitrary defined states. Just on 
+        ones defined as sequences or numpy arrays. Any other type will 
+        raise an error.
+    '''
+    if basis == 'poly':
+        def _basis(s):
+            xs = [np.prod(s**cj) for cj in cij]
+            return np.array(xs)
+
+    if basis == 'fourier':
+        def _basis(s):
+            xs = [np.cos(np.pi*np.dot(s, cj)) for cj in cij]
+            return np.array(xs)
+
+    def basis_f(s):
+        try:
+            return _basis(s)
+        except Exception as e:
+            raise BasisException('State must be a sequence or numpy array')
+    return basis_f
+    

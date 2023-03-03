@@ -37,7 +37,7 @@ def state_aggregator(state):
 
 
 if __name__ == "__main__":
-    approximator = LinearApproximator(k=10, fs_xs=10, basis_xs=state_aggregator)
+    approximator = LinearApproximator(k=10, fs=10, basis=state_aggregator)
     vqpi, samples  = gradient_mc(states, actions, random_walk, approximator,
         max_steps=1E5, alpha=2*10E-5)
     vqpi, samples  = gradient_mc(states, actions, random_walk, approximator, n_episodes=3E4,

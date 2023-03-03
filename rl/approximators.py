@@ -54,53 +54,24 @@ class SGDWA(ABC):
 class LinearApproximator(SGDWA):
     '''Linear approximator for arbitrary finite dimension state space'''
     
-    def __init__(self, k: int, n: int=None, basis: str='poly', fs_xs:int=None,
-        basis_xs: Optional[Callable[[np.ndarray], np.ndarray]]=None):
+    def __init__(self, k: int, fs:int=None,
+        basis: Optional[Callable[[np.ndarray], np.ndarray]]=None):
         '''
         Parameters
         ----------
         k: int
-            Dimension of the state space
-        n: int
-            Order of the basis function, (n+1)^k features for poly and fourier
-        basis: str, optional
-            Basis function to use, either 'poly' or 'fourier', by default 'poly'
+            state space dimensionality
+        fs: int
+            feature shape, i.e. dimensionality of the function basis 
         '''  
-        self.n = n
         self.k = k
-        self.fs_xs = fs_xs
-        self.basis = basis if not basis_xs else basis_xs.__name__
-        self._set_basis(basis_xs)
-
-    def set_weights(self, fs: int):
-        '''fs: feature shape'''
-        self.w = np.ones(fs)*W_INIT
-
-    def _set_basis(self, basis_xs) -> None:
-        if basis_xs:
-            self.basis_xs = basis_xs
-            self.set_weights(self.fs_xs)
-            return
-
-        n_set = np.arange(self.n+1)
-        cij = auto_cardinal(n_set, self.k)
-
-        # if one of the defined basis is defined fs is set 
-        # and it has (n+1)^k value
-        self.set_weights((self.n+1)**self.k)
-        if self.basis == 'poly':
-            def basis(s):
-                xs = [np.prod(s**cj) for cj in cij]
-                return np.array(xs)
-        if self.basis == 'fourier':
-            def basis(s):
-                xs = [np.cos(np.pi*np.dot(s, cj)) for cj in cij]
-                return np.array(xs)
-
-        self.basis_xs = basis 
-
+        self.fs = fs
+        self.basis_name = basis.__name__
+        self.basis = basis
+        self.w = np.ones(self.fs)*W_INIT
+        
     def grad(self, s: np.ndarray) -> np.ndarray:
-        return self.basis_xs(s)
+        return self.basis(s)
 
     def __call__(self, s):
-        return np.dot(self.w, self.basis_xs(s))
+        return np.dot(self.w, self.basis(s))
