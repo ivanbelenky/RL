@@ -90,7 +90,7 @@ def gradient_mc(states: Sequence[Any], actions: Sequence[Any], transition: Trans
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)    
     v, q, samples = _gradient_mc(model, approximator, state_0, action_0, 
-        alpha, n_episodes, max_steps, tol, optimize, sample_step)
+        alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
     return VQPi((v, q, policy)), samples
     
@@ -104,8 +104,8 @@ def _gradient_mc(MF, approximator, s_0, a_0, alpha, n_episodes,
 
     n_episode, samples, dnorm = 0, [], TOL*2
     for n_episode in tqdm(range(n_episodes), desc=f'grad-MC', unit='episodes'):
-        #if dnorm < tol:
-        #    break
+        if dnorm < tol:
+            break
         s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
 
         episode = MF.generate_episode(s_0, a_0, π, max_steps)
@@ -203,7 +203,7 @@ def semigrad_tdn(states: Sequence[Any], actions: Sequence[Any], transition: Tran
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
     v, q, samples = _semigrad_tdn(model, approximator, state_0, action_0,
-        alpha, n, n_episodes, max_steps, optimize, sample_step)
+        alpha, n, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
     return VQPi((v, q, policy)), samples
 
@@ -221,7 +221,9 @@ def _semigrad_tdn(MF, approximator, s_0, a_0, alpha, n, n_episodes, max_steps,
     v_hat = approximator
 
     n_episode, samples, dnorm = 0, [], TOL*2
-    while (n_episode < n_episodes) and (dnorm > tol):
+    for n_episode in tqdm(range(n_episodes), desc=f'semigrad-TD', unit='episodes'):
+        if dnorm < tol:
+            break
         s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
 
         s = MF.states.get_index(s_0)
@@ -247,15 +249,17 @@ def _semigrad_tdn(MF, approximator, s_0, a_0, alpha, n, n_episodes, max_steps,
                 G = gammatron[:rr.shape[0]].dot(rr)
                 G_v = G # G_q = G
                 if tau + n < T:
-                    G_v = G_v + γ**n * v_hat(S[tau+n])
+                    staun = MF.states.from_index(S[tau+n])
+                    G_v = G_v + γ**n * v_hat(staun)
                     #G_q = G_q + γ**n * q[S[tau+n], A[tau+n]]
                 
                 s_t = S[tau]
                 #a_t = A[tau]
                 
-                v_hat.w = v_hat.update(G_v, α, s_t)
+                rs_t = MF.states.from_index(s_t) # real state
+                v_hat.w = v_hat.update(G_v, α, rs_t)
 
-                v[s_t] = v_hat(s_t)
+                v[s_t] = v_hat(rs_t)
                 #q[(s_t, a_t)] = q[(s_t, a_t)] + α * (G_q - q[(s_t, a_t)])
                 #π.update_policy(q, s_t)
 

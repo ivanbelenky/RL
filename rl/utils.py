@@ -15,7 +15,7 @@ plt.style.use("dark_background")
 
 MAX_STEPS = 1E3
 MAX_ITER = int(1E4)
-TOL = 5E-5
+TOL = 5E-8
 MEAN_ITERS = int(1E4)
 W_INIT = 1E-3
 
