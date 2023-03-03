@@ -47,12 +47,11 @@ The code in this repository is organized into several modules, each of which cov
   - [x] n-step Expected SARSA
   - [x] double Q learning
   - [x] n-step Tree Backup 
-- [ ] Planning
+- [x] Planning
   - [x] Dyna-Q/Dyna-Q+
   - [x] Prioritized Sweeping
   - [x] Trajectory Sampling
   - [x] MCTS
-  - [ ] RTDP
 - [ ] On-policy Prediction 
   - [x] Linear SGD/semi-SGD
   - [ ] ANN
