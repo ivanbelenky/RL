@@ -22,7 +22,10 @@ from .solvers.planning import (
     mcts, 
     rtdp, 
 )
-
+from .solvers.approx import (
+    gradient_mc, 
+    semigrad_tdn
+)
 
 
 __all__ = [
@@ -42,4 +45,6 @@ __all__ = [
     't_sampling',
     'mcts',
     'rtdp',
+    'gradient_mc',
+    'semigrad_tdn'
 ]

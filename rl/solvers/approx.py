@@ -3,6 +3,7 @@ from typing import Sequence, Tuple, Any
 
 import numpy as np
 from numpy.linalg import norm as lnorm
+from tqdm import tqdm
 
 from rl.model_free import ModelFree, ModelFreePolicy
 from rl.approximators import SGDWA
@@ -102,10 +103,12 @@ def _gradient_mc(MF, approximator, s_0, a_0, alpha, n_episodes,
     v_hat = approximator
 
     n_episode, samples, dnorm = 0, [], TOL*2
-    while (n_episode < n_episodes) and (dnorm > tol):
+    for n_episode in tqdm(range(n_episodes), desc=f'grad-MC', unit='episodes'):
+        #if dnorm < tol:
+        #    break
         s_0, a_0 = _set_s0_a0(MF, s_0, a_0)
 
-        episode = MF.generate_episode(s_0, a_0, max_steps)
+        episode = MF.generate_episode(s_0, a_0, π, max_steps)
         sar = np.array(episode)
         v_old = v.copy()
 
@@ -114,15 +117,14 @@ def _gradient_mc(MF, approximator, s_0, a_0, alpha, n_episodes,
             s_t, a_t = int(s_t), int(a_t)
             G = γ*G + r_tt
 
-            v_hat.w = v_hat.update(G, α, s_t)
+            v_hat.w = v_hat.update(G, α, MF.states.from_index(s_t))
 
             #if optimize:
             #    π.update_policy(q, s_t)
 
-            v[s_t] = v_hat(s_t)
+            v[s_t] = v_hat(MF.states.from_index(s_t))
 
         dnorm = np.linalg.norm(v_old - v)
-        n_episode += 1
 
         if sample_step and n_episode % sample_step == 0:
             samples.append(get_sample(MF, v, q, π, n_episode, optimize))
