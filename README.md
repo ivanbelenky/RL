@@ -56,7 +56,6 @@ The code in this repository is organized into several modules, each of which cov
   - [x] Linear SGD/semi-SGD
   - [ ] ANN
   - [ ] Least-Squares TD
-  - [ ] Memory-based
   - [ ] Kernel-based
 - [ ] On-policy Control 
   - [ ] Episodic semi-gradient

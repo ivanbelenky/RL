@@ -18,14 +18,11 @@ from rl.utils import (
     Policy, 
     State, 
     Action,
-    StateAction, 
+    StateAction,
+    EpisodeStep, 
     MAX_ITER, 
     MAX_STEPS
 )
-
-
-EpisodeStep = NewType(
-    'EpisodeStep', Tuple[int, int, float])
 
 
 class TransitionException(Exception):

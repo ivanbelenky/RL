@@ -35,9 +35,7 @@ class Policy(ABC):
 
 
 class _TabularIndexer():
-    '''
-    Simple proxy for tabular state & actions.
-    '''
+    '''Simple proxy for tabular state & actions.'''
     def __init__(self, seq: Sequence[Any]):
         self.seq = seq
         self.N = len(seq)
@@ -83,6 +81,7 @@ class Vpi(_TabularValues):
     def __str__(self):
         return f'Vpi({self.v[:5]}...)'
 
+
 class Qpi(_TabularValues):
     def __str__(self):
         return f'Vpi({self.v[:5]}...)'
@@ -91,9 +90,10 @@ class Qpi(_TabularValues):
 VQPi = NewType('VQPi', Tuple[Vpi, Qpi, Policy])
 Samples = NewType('Samples', Tuple[int, List[Vpi], List[Qpi], List[Policy]])
 Transition = Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
-
+EpisodeStep = NewType('EpisodeStep', Tuple[int, int, float])
 
 class PQueue:
+    '''Priority Queue'''
     def __init__(self, items: List[Tuple[float, Any]]):
         self.items = items
         self._sort()
@@ -110,6 +110,7 @@ class PQueue:
 
     def empty(self):
         return len(self.items) == 0
+
 
 class RewardGenerator:
     DISTRIBUTION = {
@@ -309,7 +310,6 @@ def get_basis(self, basis, cij) -> Callable[[np.ndarray], np.ndarray]:
     def basis_f(s):
         try:
             return _basis(s)
-        except Exception as e:
+        except Exception:
             raise BasisException('State must be a sequence or numpy array')
     return basis_f
-    
