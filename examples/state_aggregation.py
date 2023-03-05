@@ -36,18 +36,33 @@ def state_aggregator(state):
     return x
 
 
-if __name__ == "__main__":
-    approximator = LinearApproximator(k=10, fs=10, basis=state_aggregator)
-    vqpi, samples  = gradient_mc(states, actions, random_walk, approximator,
-        max_steps=1E5, alpha=2*10E-5)
-    vqpi, samples  = gradient_mc(states, actions, random_walk, approximator, n_episodes=3E4,
-                            max_steps=1E5, alpha=2*10E-5)
-    vqpi_td, samples_td = semigrad_tdn(states, actions, random_walk, approximator, n_episodes=3E4,
-                            max_steps=1E5, alpha=2*10E-5)
+def state_generator():
+    pos = np.random.randint(1,1000)
+    group = pos//101
+    return (group, pos)
 
+
+if __name__ == "__main__":
+    approximator_mc = LinearApproximator(k=10, fs=10, basis=state_aggregator)
+    approximator_td = LinearApproximator(k=10, fs=10, basis=state_aggregator)
+    
+    vqpi_mc, samples_mc = gradient_mc(random_walk, state_generator, actions, 
+                                      approximator_mc, n_episodes=3E4, max_steps=1E5, 
+                                      alpha=2*10E-5)
+    vqpi_td, samples_td = semigrad_tdn(random_walk, state_generator, actions, 
+                                       approximator_td, n_episodes=3E4, max_steps=1E5,
+                                       alpha=2*10E-5)
+    
+    vhat_mc = vqpi_mc[0]
+    vhat_td = vqpi_td[0]
+
+    state_sample =[(pos//101, pos) for pos in np.arange(1001)]
     vpi_true = 2/1000*np.arange(1001) - 1
+    vpi_mc = np.array([vhat_mc(s) for s in state_sample])
+    vpi_td = np.array([vhat_td(s) for s in state_sample])
+
     plt.figure(figsize=(10,5))
-    plt.plot(vpi_true[1:], label='True value')
-    plt.plot(vqpi_td[0][1:], label='semigrad-tdn')
-    plt.plot(vqpi[0][1:], label='gradient-mc')
-    plt.legend(loc=4)   
+    plt.plot(vpi_true, label='True value')
+    plt.plot(vpi_td, label='semigrad-tdn')
+    plt.plot(vpi_mc, label='gradient-mc')
+    plt.legend(loc=4)

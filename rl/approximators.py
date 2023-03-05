@@ -47,9 +47,61 @@ differentiable, or hold a gradient method.
 '''
 
 
-class ModelFreeSALPolicy(Policy):
-    pass
+class Approximator(ABC):
+    '''Approximator base class that implements caster methods
+    as well as defining the basic interface of any approximator.
+    It has to be updateable and callable. Updatability implies
+    that it can change its inner attributes and hopefully learn. 
+    '''
+    @abstractmethod
+    def __call__(self, s: Any, *args, **kwargs) -> float:
+        '''Return the value of the approximation'''
+        raise NotImplementedError
 
+    @abstractmethod
+    def update(self, *args, **kwargs) -> Union[None, np.ndarray]:
+        '''Update the approximator'''
+        raise NotImplementedError
+
+    @abstractmethod
+    def copy(self, *args, **kwargs) -> Any:
+        '''Return a copy of the approximator'''
+        raise NotImplementedError
+
+
+class ModelFreeSALPolicy(Policy):
+    '''ModelFreeSALPolicy is for approximated methods what 
+    ModelFreePolicy is for tabular methods.
+
+    This policies are thought with tabular actions in mind, since
+    the problem of continuous action spaces are a topic of ongoing 
+    research and not yet standardized. For each a in the action-space A
+    there will exist an approximator.
+    '''
+    def __init__(self, actions: Sequence[Any], approximators: Sequence[Approximator]):
+        self.actions = actions
+        self.A = len(actions)
+        self.q_hat = {a: approx for a,approx in zip(self.actions, approximators)}
+    
+    def update_policy(self, a, *args, **kwargs):
+        self.q_hat[a].update(*args, **kwargs)
+
+    def __call__(self, state: Any):
+        action_idx = np.argmax([self.q_hat[a](state) for a in self.actions])
+        return self.actions[action_idx]
+        
+
+class EpsSoftSALPolicy(ModelFreeSALPolicy):
+    def __init__(self, actions: Sequence[Any], approximators: Sequence[Approximator],
+                 eps: float = 0.1):
+        super().__init__(actions, approximators)
+        self.eps = eps
+
+    def __call__(self, state):
+        if np.random.rand() < self.eps:
+            return np.random.choice(self.actions)
+        return super().__call__(state)
+    
 
 class ModelFreeSAL:
     '''
@@ -65,33 +117,25 @@ class ModelFreeSAL:
     runtime executions.
     '''
 
-    def __init__(self, transition: Callable, gamma: float = 1,
-        state_caster: Callable=None, action_caster: Callable=None,
-        policy: ModelFreeSALPolicy = None): 
-
+    def __init__(self, transition: Callable, rand_state: Callable, 
+                 policy: ModelFreeSALPolicy, gamma: float = 1): 
         self.policy = policy
+        self.rand_state = rand_state
         self.transition = transition
         self.gamma = gamma
-        self.policy = policy if policy else ModelFreeSALPolicy()
-
-        self._set_state_action_casters(state_caster, action_caster)
-
-    def _set_state_action_casters(self, s_caster, a_caster):
-        '''Set the casters for states and actions. If not defined, 
-        behold the exceptions if you did not define them correctly.'''
-        if not all([isinstance(c, Callable) for c in [s_caster, a_caster]]):
-            raise TypeError("Casters must be callable.")
-        self.cast_state = s_caster if s_caster else lambda s: s
-        self.cast_action = a_caster if a_caster else lambda a: a
         
     def random_sa(self):
-        # It could be random if range is given, but for more complicated
-        # state action spaces it is going to be difficult to generalize.
-        raise NotImplementedError
+        a = np.random.choice(self.policy.actions)
+        s = self.rand_state()
+        return s, a
 
-    def generate_episode(self, s_0: Any, a_0: Any, policy: ModelFreeSALPolicy=None, 
-        max_steps: int=MAX_STEPS) -> List[EpisodeStep]:
-
+    def generate_episode(self, 
+                         s_0: Any, 
+                         a_0: Any, 
+                         policy: ModelFreeSALPolicy=None, 
+                         max_steps: int=MAX_STEPS) -> List[EpisodeStep]:
+        '''Generate an episode using given policy if any, otherwise
+        use the one defined as the attribute'''
         policy = policy if policy else self.policy
         episode = []
         end = False
@@ -111,43 +155,6 @@ class ModelFreeSAL:
         return self.transition(state, action)
 
 
-class Approximator(ABC):
-    '''Approximator base class that implements caster methods
-    as well as defining the basic interface of any approximator.
-    It has to be updateable and callable. Updatability implies
-    that it can change its inner attributes and hopefully learn. 
-    '''
-    def __init__(self, state_caster=None, action_caster=None):
-        self._set_state_action_casters(state_caster, action_caster)
-
-    def _set_state_action_casters(self, s_caster, a_caster):
-        '''Set the casters for states and actions. If not defined, 
-        behold the exceptions if you did not define them correctly.'''
-        if s_caster:
-            if not isinstance(s_caster, Callable):
-                raise TypeError("State caster must be callable.")
-        if a_caster:
-            if not isinstance(a_caster, Callable):
-                raise TypeError("Action caster must be callable.")
-        self.cast_state = s_caster if s_caster else lambda s: s
-        self.cast_action = a_caster if a_caster else lambda a: a
-
-    @abstractmethod
-    def __call__(self, s: Any, *args, **kwargs) -> float:
-        '''Return the value of the approximation'''
-        raise NotImplementedError
-
-    @abstractmethod
-    def update(self, *args, **kwargs) -> Union[None, np.ndarray]:
-        '''Update the approximator'''
-        raise NotImplementedError
-
-    @abstractmethod
-    def copy(self, *args, **kwargs) -> Any:
-        '''Return a copy of the approximator'''
-        raise NotImplementedError
-
-
 class SGDWA(Approximator):
     '''Stochastic Gradient Descent Weight-Vector Approximator
 
@@ -158,20 +165,18 @@ class SGDWA(Approximator):
         '''Return the gradient of the approximation'''
         raise NotImplementedError
 
-    def update(self, U: float, alpha: float, s: Any) -> np.ndarray:
-        return self.w + alpha * (U - self(s)) * self.grad(s)
+    def delta_w(self, U: float, alpha: float, s: Any) -> np.ndarray:
+        return alpha * (U - self(s)) * self.grad(s)
 
     def copy(self):
         return copy.deepcopy(self)
         
 
-
 class LinearApproximator(SGDWA):
     '''Linear approximator for arbitrary finite dimension state space'''
     
     def __init__(self, k: int, fs:int=None,
-        basis: Optional[Callable[[Any], np.ndarray]]=None,
-        action_caster: Callable=None):
+        basis: Optional[Callable[[Any], np.ndarray]]=None):
         '''
         Parameters
         ----------
@@ -179,17 +184,26 @@ class LinearApproximator(SGDWA):
             state space dimensionality
         fs: int
             feature shape, i.e. dimensionality of the function basis
-        basis: Callable[[Any], np.ndarray]
+        basis: Callable[[Any], np.ndarray], optional
+            function basis defaults to identity. If not specified the
+            signature must be Callable[[np.ndarray], np.ndarray] otherwise
+            it will be probably fail miserably. 
         '''  
         self.k = k
         self.fs = fs
         self.basis_name = basis.__name__
-        self.basis = basis
+        self.basis = basis if basis else lambda x: x
         self.w = np.ones(self.fs)*W_INIT
-        self._set_state_action_casters(basis, action_caster)
         
     def grad(self, s: Any) -> np.ndarray:
+        '''Pretty straightforward grad'''
         return self.basis(s)
+
+    def update(self, U: float, alpha: float, s: Any) -> np.ndarray:
+        '''Updates inplace the weight vector and returns it just in case'''
+        dw = super().delta_w(U, alpha, s)
+        self.w = self.w + dw
+        return dw
 
     def __call__(self, s):
         return np.dot(self.w, self.basis(s))

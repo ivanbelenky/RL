@@ -1,11 +1,18 @@
 from abc import ABC, abstractclassmethod
-from typing import Sequence, Tuple, Any, NewType
+from typing import Sequence, Callable, Tuple, Any, NewType
+from copy import deepcopy
 
 import numpy as np
 from numpy.linalg import norm as lnorm
 from tqdm import tqdm
 
-from rl.approximators import Approximator, SGDWA, ModelFreeSAL, ModelFreeSALPolicy
+from rl.approximators import (
+    Approximator, 
+    SGDWA, 
+    ModelFreeSAL, 
+    ModelFreeSALPolicy,
+    EpsSoftSALPolicy
+)
 from rl.utils import (
     _typecheck_all,
     _get_sample_step,
@@ -17,42 +24,69 @@ from rl.utils import (
     TOL
 )
 
-class AVQPi:
-    def __init__(self, vqpi:Tuple[Approximator, Approximator, ModelFreeSALPolicy]):
-        self._v_hat, self._q_hat, self.pi = vqpi
 
-    @property
-    def v_hat(self):
-        return self.v
-    
-    @property
-    def q_hat(self):
-        return self.q
-    
+AVQPi = NewType('AVQPi', Tuple[Approximator, Approximator, ModelFreeSALPolicy])
 
-def get_sample(v_hat, q_hat, n_episode, optimize):
+
+def get_sample(v_hat, q_hat, π, n_episode, optimize):
     _idx = n_episode
     _v = v_hat.copy() 
-    _q = None #AQpi(q_hat.copy())
+    _q = q_hat.copy()
     _pi = None
+    if optimize:
+        _pi = deepcopy(π)
     return (_idx, _v, _q, _pi)
 
 
-def _set_s0_a0():
-    raise NotImplementedError
+def _set_s0_a0(MFS, s, a):
+    s_0, a_0 = MFS.random_sa()
+    s_0 = s_0 if not s else s
+    a_0 = a_0 if not a else a
+    return s_0, a_0
 
 
-def gradient_mc(transition: Transition, approximator: SGDWA, state_0: Any=None, 
-    action_0: Any=None, alpha: float=0.05, gamma: float=1.0, n_episodes: int=MAX_ITER,
-    max_steps: int=MAX_STEPS, samples: int=1000, optimize: bool=False, 
-    policy: ModelFreeSALPolicy=None, tol: float=TOL, eps: float=None
-    ) -> Tuple[AVQPi, Samples]:
-    '''
+def _set_policy(policy, eps, actions, approximator):
+    apxs = [deepcopy(approximator) for _ in actions]
+    if not policy and eps:
+        _typecheck_all(constants=[eps])
+        _check_ranges(values=[eps], ranges=[(0,1)])
+        policy = EpsSoftSALPolicy(actions, approximators=apxs, eps=eps)
+    elif not policy:
+        policy = ModelFreeSALPolicy(actions, approximators=apxs)
+    return policy
+
+
+def gradient_mc(transition: Transition,
+                random_state: Callable[[Any], Any],
+                actions: Sequence[Any],
+                approximator: SGDWA, 
+                state_0: Any=None, 
+                action_0: Any=None, 
+                alpha: float=0.05, 
+                gamma: float=1.0, 
+                n_episodes: int=MAX_ITER, 
+                max_steps: int=MAX_STEPS, 
+                samples: int=1000, 
+                optimize: bool=False, 
+                policy: ModelFreeSALPolicy=None, 
+                tol: float=TOL, 
+                eps: float=None) -> Tuple[AVQPi, Samples]:
+    '''Gradient α-MC algorithm for estimating, and optimizing policies
+
+    gradient_mc uses the gradient of VE to estimate the value of 
+    a state given a policy. The work behind estimation runs is to
+    the training process of the value function approximator with MC 
+    estimates. It can also optimize the policies themselves.
+    
     Parameters
     ----------
     transition : Callable[[Any,Any],[[Any,float], bool]]]
         transition must be a callable function that takes as arguments the
         (state, action) and returns (new_state, reward), end.
+    random_state : Callable[[Any], Any]
+        random state generator
+    actions : Sequence[Any]
+        Sequence of possible actions
     approximator : SGDWA
         Function approximator to use for the state value function
     state_0 : Any, optional
@@ -92,6 +126,8 @@ def gradient_mc(transition: Transition, approximator: SGDWA, state_0: Any=None,
     TransitionError: If any of the arguments is not of the correct type.
     '''
 
+    policy = _set_policy(policy, eps, actions, approximator)
+
     _typecheck_all(transition=transition,
         constants=[gamma, alpha, n_episodes, max_steps, samples, tol],
         booleans=[optimize], policies=[policy])
@@ -101,8 +137,8 @@ def gradient_mc(transition: Transition, approximator: SGDWA, state_0: Any=None,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeSAL(transition, gamma=gamma, policy=policy)    
-    vh, qh, samples = _gradient_mc(model, approximator, state_0, action_0, 
+    model = ModelFreeSAL(transition, random_state, policy, gamma=gamma)
+    vh, qh, samples = _gradient_mc(model, approximator, state_0, action_0,
         alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
     return AVQPi((vh, qh, policy)), samples
@@ -113,8 +149,9 @@ def _gradient_mc(MFS, approximator, s_0, a_0, alpha, n_episodes,
 
     α, γ, π = alpha, MFS.gamma, MFS.policy
     v_hat = approximator
+    q_hat = π.q_hat
 
-    n_episode, samples, dnorm = 0, [], TOL*2
+    samples, dnorm = [], TOL*2
     for n_episode in tqdm(range(n_episodes), desc=f'grad-MC', unit='episodes'):
         if dnorm < tol:
             break
@@ -126,24 +163,35 @@ def _gradient_mc(MFS, approximator, s_0, a_0, alpha, n_episodes,
         G = 0   
         for s_t, a_t, r_tt in episode[::-1]:
             G = γ*G + r_tt
-            v_hat.w = v_hat.update(G, α, s_t)
+            v_hat.update(G, α, s_t)
             
-            #if optimize:
-            #    π.update_policy(q, s_t)
+            if optimize:
+                q_hat[a_t].update(G, α, s_t)
 
         dnorm = lnorm(w_old - v_hat.w)
 
         if sample_step and n_episode % sample_step == 0:
-            samples.append(get_sample(v_hat, None, π, n_episode, optimize))
+            samples.append(get_sample(v_hat, q_hat, π, n_episode, optimize))
 
-    return v_hat, None, samples #TODO: q function approximator
+    return v_hat, q_hat, samples
 
 
-def semigrad_tdn(transition: Transition, approximator: SGDWA, state_0: Any=None, 
-    action_0: Any=None, alpha: float=0.05, n: int=1, gamma: float=1.0, 
-    n_episodes: int=MAX_ITER, max_steps: int=MAX_STEPS, samples: int=1000, 
-    optimize: bool=False, policy: ModelFreeSALPolicy=None, tol: float=TOL, 
-    eps: float=None) -> Tuple[AVQPi, Samples]:
+def semigrad_tdn(transition: Transition, 
+                 random_state: Callable[[Any], Any],
+                 actions: Sequence[Any],
+                 approximator: SGDWA,
+                 state_0: Any=None,
+                 action_0: Any=None,
+                 alpha: float=0.05,
+                 n: int=1,
+                 gamma: float=1.0,
+                 n_episodes: int=MAX_ITER,
+                 max_steps: int=MAX_STEPS,
+                 samples: int=1000,
+                 optimize: bool=False,
+                 policy: ModelFreeSALPolicy=None,
+                 tol: float=TOL,
+                 eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Semi-Gradient n-step Temporal Difference
     
     Solver for the n-step temporal difference algorithm. The algorithm is
@@ -155,8 +203,12 @@ def semigrad_tdn(transition: Transition, approximator: SGDWA, state_0: Any=None,
     transition : Callable[[Any,Any],[[Any,float], bool]]]
         transition must be a callable function that takes as arguments the
         (state, action) and returns (new_state, reward), end.
+    random_state : Callable[[Any], Any]
+        random state generator
     approximator : SGDWA
         Function approximator to use for the state value function
+    actions: Sequence[Any]
+        Sequence of possible actions
     state_0 : Any, optional
         Initial state, by default None (random)
     action_0 : Any, optional
@@ -195,6 +247,7 @@ def semigrad_tdn(transition: Transition, approximator: SGDWA, state_0: Any=None,
     ------
     TransitionError: If any of the arguments is not of the correct type.
     '''
+    policy = _set_policy(policy, eps, actions, approximator)
 
     _typecheck_all(transition=transition,
         constants=[gamma, alpha, n_episodes, max_steps, samples, tol, n],
@@ -205,7 +258,7 @@ def semigrad_tdn(transition: Transition, approximator: SGDWA, state_0: Any=None,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeSAL(transition, gamma=gamma, policy=policy)
+    model = ModelFreeSAL(transition, random_state, policy, gamma=gamma)
     v, q, samples = _semigrad_tdn(model, approximator, state_0, action_0,
         alpha, n, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
@@ -214,7 +267,7 @@ def semigrad_tdn(transition: Transition, approximator: SGDWA, state_0: Any=None,
 
 def _semigrad_tdn(MFS, approximator, s_0, a_0, alpha, n, n_episodes, max_steps, 
     tol, optimize, sample_step):
-    '''Semi gradient n-step temporal differnece
+    '''Semi gradient n-step temporal difference
 
     DRY but clear.
     '''
@@ -222,12 +275,13 @@ def _semigrad_tdn(MFS, approximator, s_0, a_0, alpha, n, n_episodes, max_steps,
     α, γ, π = alpha, MFS.gamma, MFS.policy
     gammatron = np.array([γ**i for i in range(n)])
     v_hat = approximator
+    q_hat = π.q_hat
 
-    n_episode, samples, dnorm = 0, [], TOL*2
+    samples, dnorm = [], TOL*2
     for n_episode in tqdm(range(n_episodes), desc=f'semigrad-TD', unit='episodes'):
         if dnorm < tol:
             break
-        s_0, a_0 = _set_s0_a0(MFS, s_0, a_0)
+        s, a = _set_s0_a0(MFS, s_0, a_0)
 
         w_old = v_hat.w.copy()
 
@@ -248,44 +302,55 @@ def _semigrad_tdn(MFS, approximator, s_0, a_0, alpha, n, n_episodes, max_steps,
             if tau >= 0:
                 rr = np.array(R[tau:min(tau+n, T)])
                 G = gammatron[:rr.shape[0]].dot(rr)
-                G_v = G # G_q = G
+                G_v, G_q = G, G
                 if tau + n < T:
                     G_v = G_v + γ**n * v_hat(S[tau+n])
-                    #G_q = G_q + γ**n * q[S[tau+n], A[tau+n]]
+                    G_q = G_q + γ**n * q_hat[A[tau+n]](S[tau+n])
                 
                 s_t = S[tau]
-                #a_t = A[tau]
+                a_t = A[tau]
                 
-                v_hat.w = v_hat.update(G_v, α, s_t)
+                v_hat.update(G_v, α, s_t)
 
-                #π.update_policy(q, s_t)
+                if optimize:
+                    q_hat[a_t].update(G_q, α, s_t)
 
             if tau == T - 1:
                 break
-
+        
         dnorm = lnorm(w_old - v_hat.w)
 
         if n_episode % sample_step == 0:
-            samples.append(get_sample(v_hat, None, π, n_episode, optimize))
+            samples.append(get_sample(v_hat, q_hat, π, n_episode, optimize))
         n_episode += 1
 
-    return v_hat, None, samples #TODO: q function approximator
+    return v_hat, q_hat, samples
 
 
-def lstd(transition: Transition, state_0: Any=None, action_0: Any=None, 
-    alpha: float=0.05, gamma: float=1.0, n_episodes: int=MAX_ITER, 
-    max_steps: int=MAX_STEPS, samples: int=1000, optimize: bool=False, 
-    policy: ModelFreeSALPolicy=None, tol: float=TOL, eps: float=None
-    ) -> Tuple[AVQPi, Samples]:
+# TODO: policy setting and optimize
+def lstd(transition: Transition,
+         random_state: Callable[[Any], Any],
+         state_0: Any=None, 
+         action_0: Any=None, 
+         alpha: float=0.05, 
+         gamma: float=1.0, 
+         n_episodes: int=MAX_ITER, 
+         max_steps: int=MAX_STEPS, 
+         samples: int=1000, 
+         optimize: bool=False, 
+         policy: ModelFreeSALPolicy=None, 
+         tol: float=TOL, eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Least squares n-step temporal differnece
     
     Parameters
     ----------
-    states : Sequence[Any]
-    actions : Sequence[Any]
     transition : Callable[[Any,Any],[[Any,float], bool]]]
         transition must be a callable function that takes as arguments the
         (state, action) and returns (new_state, reward), end.
+    random_state: Callable[[Any], Any]
+        random state generator
+    actions : Sequence[Any]
+        Sequence of possible actions
     state_0 : Any, optional
         Initial state, by default None (random)
     action_0 : Any, optional
@@ -322,6 +387,8 @@ def lstd(transition: Transition, state_0: Any=None, action_0: Any=None,
     ------
     TransitionError: If any of the arguments is not of the correct type.
     '''
+    
+    #policy = _set_policy(policy, eps, actions, approximator)
 
     _typecheck_all(transition=transition,
         constants=[gamma, alpha, n_episodes, max_steps, samples, tol],
@@ -332,14 +399,13 @@ def lstd(transition: Transition, state_0: Any=None, action_0: Any=None,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeSAL(transition, gamma=gamma, policy=policy)
+    model = ModelFreeSAL(transition, random_state, policy, gamma=gamma)
     v, q, samples = _lstd(model, state_0, action_0,
         alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
     return AVQPi((v, q, policy)), samples
 
 
-def _lstd(MF, s_0, a_0, alpha, n_episodes, max_steps, tol, optimize, 
-            sample_step):
+def _lstd(MF, s_0, a_0, alpha, n_episodes, max_steps, tol, optimize, sample_step):
 
     raise NotImplementedError

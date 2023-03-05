@@ -44,12 +44,10 @@ def get_sample(MF, v, q, π, n_episode, optimize):
     return (_idx, _v, _q, _pi)
 
 
-def _set_s0_a0(MF, s_0, a_0):
-    if not s_0:
-        s_0, _ = MF.random_sa(value=True) 
-    if not a_0:
-        _, a_0 = MF.random_sa(value=True)
-
+def _set_s0_a0(MF, s, a):
+    s_0, a_0 = MF.random_sa()
+    s_0 = s_0 if not s else s
+    a_0 = a_0 if not a else a
     return s_0, a_0
 
 
