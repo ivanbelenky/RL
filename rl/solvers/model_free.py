@@ -107,10 +107,11 @@ def alpha_mc(states: Sequence[Any], actions: Sequence[Any], transition: Transiti
     -------
     vqpi : Tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]] 
+    samples : Tuple[int, Vpi, Qpi, Policy]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
-        the action-value function and the fourth is the TODO:.
+        the action-value function and the fourth is the policy until
+        optimization point idx.
 
     Raises
     ------

@@ -24,17 +24,21 @@ from rl.utils import (
     TOL
 )
 
-
-AVQPi = NewType('AVQPi', Tuple[Approximator, Approximator, ModelFreeSALPolicy])
+class AVQPi:
+    def __init__(self, v: Approximator, q: Approximator, pi: ModelFreeSALPolicy):
+        self.v_hat = v
+        self.q = q
+        self.pi = pi
 
 
 def get_sample(v_hat, q_hat, π, n_episode, optimize):
     _idx = n_episode
     _v = v_hat.copy() 
-    _q = q_hat.copy()
+    _q = None
     _pi = None
     if optimize:
         _pi = deepcopy(π)
+        _q = q_hat.copy()
     return (_idx, _v, _q, _pi)
 
 
@@ -141,7 +145,7 @@ def gradient_mc(transition: Transition,
     vh, qh, samples = _gradient_mc(model, approximator, state_0, action_0,
         alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
-    return AVQPi((vh, qh, policy)), samples
+    return AVQPi(vh, qh, policy), samples
     
 
 def _gradient_mc(MFS, approximator, s_0, a_0, alpha, n_episodes, 
@@ -262,7 +266,7 @@ def semigrad_tdn(transition: Transition,
     v, q, samples = _semigrad_tdn(model, approximator, state_0, action_0,
         alpha, n, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
-    return AVQPi((v, q, policy)), samples
+    return AVQPi(v, q, policy), samples
 
 
 def _semigrad_tdn(MFS, approximator, s_0, a_0, alpha, n, n_episodes, max_steps, 
@@ -403,7 +407,7 @@ def lstd(transition: Transition,
     v, q, samples = _lstd(model, state_0, action_0,
         alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
-    return AVQPi((v, q, policy)), samples
+    return AVQPi(v, q, policy), samples
 
 
 def _lstd(MF, s_0, a_0, alpha, n_episodes, max_steps, tol, optimize, sample_step):
