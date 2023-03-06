@@ -78,23 +78,23 @@ class ModelFreeSALPolicy(Policy):
     research and not yet standardized. For each a in the action-space A
     there will exist an approximator.
     '''
-    def __init__(self, actions: Sequence[Any], approximators: Sequence[Approximator]):
+    def __init__(self, actions: Sequence[Any], q_hat: Approximator):
         self.actions = actions
         self.A = len(actions)
-        self.q_hat = {a: approx for a,approx in zip(self.actions, approximators)}
+        self.q_hat = q_hat
     
-    def update_policy(self, a, *args, **kwargs):
-        self.q_hat[a].update(*args, **kwargs)
+    def update_policy(self, *args, **kwargs):
+        self.q_hat.update(*args, **kwargs)
 
     def __call__(self, state: Any):
-        action_idx = np.argmax([self.q_hat[a](state) for a in self.actions])
+        action_idx = np.argmax([self.q_hat((state, a)) for a in self.actions])
         return self.actions[action_idx]
         
 
 class EpsSoftSALPolicy(ModelFreeSALPolicy):
-    def __init__(self, actions: Sequence[Any], approximators: Sequence[Approximator],
+    def __init__(self, actions: Sequence[Any], q_hat: Approximator,
                  eps: float = 0.1):
-        super().__init__(actions, approximators)
+        super().__init__(actions, q_hat)
         self.eps = eps
 
     def __call__(self, state):
@@ -161,27 +161,12 @@ class SGDWA(Approximator):
     Differentiable Value Function approximator dependent
     on a weight vector. Must define a gradient method. 
     '''
-    def grad(self, s: Any, *args, **kwargs) -> np.ndarray:
-        '''Return the gradient of the approximation'''
-        raise NotImplementedError
-
-    def delta_w(self, U: float, alpha: float, s: Any) -> np.ndarray:
-        return alpha * (U - self(s)) * self.grad(s)
-
-    def copy(self):
-        return copy.deepcopy(self)
-        
-
-class LinearApproximator(SGDWA):
-    '''Linear approximator for arbitrary finite dimension state space'''
-    
-    def __init__(self, k: int, fs:int=None,
-        basis: Optional[Callable[[Any], np.ndarray]]=None):
+    def __init__(self, 
+                 fs:int=None,
+                 basis: Optional[Callable[[Any], np.ndarray]]=None):
         '''
         Parameters
         ----------
-        k: int
-            state space dimensionality
         fs: int
             feature shape, i.e. dimensionality of the function basis
         basis: Callable[[Any], np.ndarray], optional
@@ -189,21 +174,33 @@ class LinearApproximator(SGDWA):
             signature must be Callable[[np.ndarray], np.ndarray] otherwise
             it will be probably fail miserably. 
         '''  
-        self.k = k
         self.fs = fs
         self.basis_name = basis.__name__
         self.basis = basis if basis else lambda x: x
         self.w = np.ones(self.fs)*W_INIT
-        
-    def grad(self, s: Any) -> np.ndarray:
-        '''Pretty straightforward grad'''
-        return self.basis(s)
 
-    def update(self, U: float, alpha: float, s: Any) -> np.ndarray:
+    def grad(self, x: Any, *args, **kwargs) -> np.ndarray:
+        '''Return the gradient of the approximation'''
+        raise NotImplementedError
+
+    def delta_w(self, U: float, alpha: float, x: Any) -> np.ndarray:
+        return alpha * (U - self(x)) * self.grad(x)
+
+    def copy(self):
+        return copy.deepcopy(self)
+        
+
+class LinearApproximator(SGDWA):
+    '''Linear approximator for arbitrary finite dimension state space'''
+    def grad(self, x: Any) -> np.ndarray:
+        '''Pretty straightforward grad'''
+        return self.basis(x)
+
+    def update(self, U: float, alpha: float, x: Any) -> np.ndarray:
         '''Updates inplace the weight vector and returns it just in case'''
-        dw = super().delta_w(U, alpha, s)
+        dw = super().delta_w(U, alpha, x)
         self.w = self.w + dw
         return dw
 
-    def __call__(self, s):
-        return np.dot(self.w, self.basis(s))
+    def __call__(self, x):
+        return np.dot(self.w, self.basis(x))

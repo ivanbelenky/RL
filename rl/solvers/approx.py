@@ -49,21 +49,45 @@ def _set_s0_a0(MFS, s, a):
     return s_0, a_0
 
 
-def _set_policy(policy, eps, actions, approximator):
-    apxs = [deepcopy(approximator) for _ in actions]
-    if not policy and eps:
-        _typecheck_all(constants=[eps])
-        _check_ranges(values=[eps], ranges=[(0,1)])
-        policy = EpsSoftSALPolicy(actions, approximators=apxs, eps=eps)
-    elif not policy:
-        policy = ModelFreeSALPolicy(actions, approximators=apxs)
+def onehot_q_hat(v_hat, actions):
+    '''V(s) function approximator to Q(s,a) function approximator'''
+    A = len(actions)
+    onehot_actions = {a:np.zeros(A-1) for a in actions}
+    for a in range(A-1):
+        onehot_actions[a][a] = 1
+
+    def new_basis(sa):
+        s, a = sa
+        b_s = v_hat.basis(s)
+        a = onehot_actions[a]
+        b_sa = np.append(b_s, a)
+        return b_sa
+
+    fs = v_hat.fs + A - 1
+    basis = new_basis
+    
+    q_hat = v_hat.__class__(fs, basis)
+    return q_hat
+    
+
+def _set_policy(policy, eps, actions, v_hat, q_hat):
+    if not policy:
+        if not q_hat:
+            q_hat = onehot_q_hat(v_hat, actions)
+        if eps:
+            _typecheck_all(constants=[eps])
+            _check_ranges(values=[eps], ranges=[(0,1)])
+            policy = EpsSoftSALPolicy(actions, q_hat, eps=eps)
+        else:
+            policy = ModelFreeSALPolicy(actions, q_hat)
     return policy
 
 
 def gradient_mc(transition: Transition,
                 random_state: Callable[[Any], Any],
                 actions: Sequence[Any],
-                approximator: SGDWA, 
+                v_hat: SGDWA,
+                q_hat: SGDWA=None, 
                 state_0: Any=None, 
                 action_0: Any=None, 
                 alpha: float=0.05, 
@@ -71,7 +95,7 @@ def gradient_mc(transition: Transition,
                 n_episodes: int=MAX_ITER, 
                 max_steps: int=MAX_STEPS, 
                 samples: int=1000, 
-                optimize: bool=False, 
+                optimize: bool=False,
                 policy: ModelFreeSALPolicy=None, 
                 tol: float=TOL, 
                 eps: float=None) -> Tuple[AVQPi, Samples]:
@@ -91,8 +115,12 @@ def gradient_mc(transition: Transition,
         random state generator
     actions : Sequence[Any]
         Sequence of possible actions
-    approximator : SGDWA
+    v_hat : SGDWA
         Function approximator to use for the state value function
+    q_hat: SGDWA, optional
+        Function approximator to use for the action-value function, by default None
+        and will be replaced by a mocked version of q_hat where a one hot 
+        encoding is going to get appended to the state vector.
     state_0 : Any, optional
         Initial state, by default None (random)
     action_0 : Any, optional
@@ -130,7 +158,7 @@ def gradient_mc(transition: Transition,
     TransitionError: If any of the arguments is not of the correct type.
     '''
 
-    policy = _set_policy(policy, eps, actions, approximator)
+    policy = _set_policy(policy, eps, actions, v_hat, q_hat)
 
     _typecheck_all(transition=transition,
         constants=[gamma, alpha, n_episodes, max_steps, samples, tol],
@@ -142,17 +170,16 @@ def gradient_mc(transition: Transition,
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFreeSAL(transition, random_state, policy, gamma=gamma)
-    vh, qh, samples = _gradient_mc(model, approximator, state_0, action_0,
+    vh, qh, samples = _gradient_mc(model, v_hat, state_0, action_0,
         alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
     return AVQPi(vh, qh, policy), samples
     
 
-def _gradient_mc(MFS, approximator, s_0, a_0, alpha, n_episodes, 
+def _gradient_mc(MFS, v_hat, s_0, a_0, alpha, n_episodes, 
     max_steps, tol, optimize, sample_step):
 
     α, γ, π = alpha, MFS.gamma, MFS.policy
-    v_hat = approximator
     q_hat = π.q_hat
 
     samples, dnorm = [], TOL*2
@@ -170,7 +197,7 @@ def _gradient_mc(MFS, approximator, s_0, a_0, alpha, n_episodes,
             v_hat.update(G, α, s_t)
             
             if optimize:
-                q_hat[a_t].update(G, α, s_t)
+                q_hat.update(G, α, (s_t, a_t))
 
         dnorm = lnorm(w_old - v_hat.w)
 
@@ -183,7 +210,8 @@ def _gradient_mc(MFS, approximator, s_0, a_0, alpha, n_episodes,
 def semigrad_tdn(transition: Transition, 
                  random_state: Callable[[Any], Any],
                  actions: Sequence[Any],
-                 approximator: SGDWA,
+                 v_hat: SGDWA,
+                 q_hat: SGDWA=None,
                  state_0: Any=None,
                  action_0: Any=None,
                  alpha: float=0.05,
@@ -200,7 +228,10 @@ def semigrad_tdn(transition: Transition,
     
     Solver for the n-step temporal difference algorithm. The algorithm is
     semi-gradient in the sense that it uses a function approximator to
-    estimate the _true_ value function. 
+    estimate the _true_ value function. If optimize is set, since no
+    encoding of the action into the feature basis is done, the algorithm
+    will optimize the policy making one approximator per action. Naive,
+    and cost-innefective
 
     Parameters
     ----------
@@ -209,8 +240,12 @@ def semigrad_tdn(transition: Transition,
         (state, action) and returns (new_state, reward), end.
     random_state : Callable[[Any], Any]
         random state generator
-    approximator : SGDWA
+    v_hat : SGDWA
         Function approximator to use for the state value function
+    q_hat: SGDWA, optional
+        Function approximator to use for the action-value function, by default None
+        and will be replaced by a mocked version of q_hat where a one hot 
+        encoding is going to get appended to the state vector.
     actions: Sequence[Any]
         Sequence of possible actions
     state_0 : Any, optional
@@ -251,7 +286,7 @@ def semigrad_tdn(transition: Transition,
     ------
     TransitionError: If any of the arguments is not of the correct type.
     '''
-    policy = _set_policy(policy, eps, actions, approximator)
+    policy = _set_policy(policy, eps, actions, v_hat, q_hat)
 
     _typecheck_all(transition=transition,
         constants=[gamma, alpha, n_episodes, max_steps, samples, tol, n],
@@ -263,13 +298,13 @@ def semigrad_tdn(transition: Transition,
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFreeSAL(transition, random_state, policy, gamma=gamma)
-    v, q, samples = _semigrad_tdn(model, approximator, state_0, action_0,
+    v, q, samples = _semigrad_tdn(model, v_hat, state_0, action_0,
         alpha, n, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
     return AVQPi(v, q, policy), samples
 
 
-def _semigrad_tdn(MFS, approximator, s_0, a_0, alpha, n, n_episodes, max_steps, 
+def _semigrad_tdn(MFS, v_hat, s_0, a_0, alpha, n, n_episodes, max_steps, 
     tol, optimize, sample_step):
     '''Semi gradient n-step temporal difference
 
@@ -278,7 +313,6 @@ def _semigrad_tdn(MFS, approximator, s_0, a_0, alpha, n, n_episodes, max_steps,
 
     α, γ, π = alpha, MFS.gamma, MFS.policy
     gammatron = np.array([γ**i for i in range(n)])
-    v_hat = approximator
     q_hat = π.q_hat
 
     samples, dnorm = [], TOL*2
@@ -309,7 +343,7 @@ def _semigrad_tdn(MFS, approximator, s_0, a_0, alpha, n, n_episodes, max_steps,
                 G_v, G_q = G, G
                 if tau + n < T:
                     G_v = G_v + γ**n * v_hat(S[tau+n])
-                    G_q = G_q + γ**n * q_hat[A[tau+n]](S[tau+n])
+                    G_q = G_q + γ**n * q_hat((S[tau+n], A[tau+n]))
                 
                 s_t = S[tau]
                 a_t = A[tau]
@@ -317,7 +351,7 @@ def _semigrad_tdn(MFS, approximator, s_0, a_0, alpha, n, n_episodes, max_steps,
                 v_hat.update(G_v, α, s_t)
 
                 if optimize:
-                    q_hat[a_t].update(G_q, α, s_t)
+                    q_hat.update(G_q, α, (s_t, a_t))
 
             if tau == T - 1:
                 break
