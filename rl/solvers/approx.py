@@ -120,7 +120,7 @@ def gradient_mc(transition: Transition,
     q_hat: SGDWA, optional
         Function approximator to use for the action-value function, by default None
         and will be replaced by a mocked version of q_hat where a one hot 
-        encoding is going to get appended to the state vector.
+        encoding for the actions is going to get appended to the state vector.
     state_0 : Any, optional
         Initial state, by default None (random)
     action_0 : Any, optional

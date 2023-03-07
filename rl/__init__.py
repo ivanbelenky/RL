@@ -26,7 +26,7 @@ from .solvers.approx import (
     gradient_mc, 
     semigrad_tdn
 )
-
+from .tiles import IHT, tiles
 
 __all__ = [
     'ModelFree',
@@ -46,5 +46,7 @@ __all__ = [
     'mcts',
     'rtdp',
     'gradient_mc',
-    'semigrad_tdn'
+    'semigrad_tdn',
+    'Tile',
+    'tiles'
 ]
