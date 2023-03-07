@@ -58,8 +58,8 @@ The code in this repository is organized into several modules, each of which cov
   - [ ] Least-Squares TD
   - [ ] Kernel-based
 - [ ] On-policy Control 
-  - [ ] Episodic semi-gradient
-  - [ ] Semi-gradient n-step Sarsa
+  - [x] Episodic semi-gradient
+  - [x] Semi-gradient n-step Sarsa
   - [ ] Differential Semi-gradient n-step Sarsa
 
 <br>
