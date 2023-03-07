@@ -53,7 +53,8 @@ The code in this repository is organized into several modules, each of which cov
   - [x] Trajectory Sampling
   - [x] MCTS
 - [ ] On-policy Prediction 
-  - [x] Linear SGD/semi-SGD
+  - [x] Gradient MC
+  - [x] $n$-step semi-gradient TD
   - [ ] ANN
   - [ ] Least-Squares TD
   - [ ] Kernel-based
