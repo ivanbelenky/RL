@@ -58,10 +58,10 @@ The code in this repository is organized into several modules, each of which cov
   - [ ] ANN
   - [ ] Least-Squares TD
   - [ ] Kernel-based
-- [ ] On-policy Control 
+- [x] On-policy Control 
   - [x] Episodic semi-gradient
   - [x] Semi-gradient n-step Sarsa
-  - [ ] Differential Semi-gradient n-step Sarsa
+  - [x] Differential Semi-gradient n-step Sarsa
 
 <br>
 
