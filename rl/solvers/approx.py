@@ -9,8 +9,8 @@ from tqdm import tqdm
 from rl.approximators import (
     Approximator, 
     SGDWA, 
-    ModelFreeSAL, 
-    ModelFreeSALPolicy,
+    ModelFreeSL, 
+    ModelFreeSLPolicy,
     EpsSoftSALPolicy
 )
 from rl.utils import (
@@ -25,7 +25,7 @@ from rl.utils import (
 )
 
 class AVQPi:
-    def __init__(self, v: Approximator, q: Approximator, pi: ModelFreeSALPolicy):
+    def __init__(self, v: Approximator, q: Approximator, pi: ModelFreeSLPolicy):
         self.v_hat = v
         self.q = q
         self.pi = pi
@@ -79,7 +79,7 @@ def _set_policy(policy, eps, actions, v_hat, q_hat):
             _check_ranges(values=[eps], ranges=[(0,1)])
             policy = EpsSoftSALPolicy(actions, q_hat, eps=eps)
         else:
-            policy = ModelFreeSALPolicy(actions, q_hat)
+            policy = ModelFreeSLPolicy(actions, q_hat)
     return policy
 
 
@@ -96,7 +96,7 @@ def gradient_mc(transition: Transition,
                 max_steps: int=MAX_STEPS, 
                 samples: int=1000, 
                 optimize: bool=False,
-                policy: ModelFreeSALPolicy=None, 
+                policy: ModelFreeSLPolicy=None, 
                 tol: float=TOL, 
                 eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Gradient α-MC algorithm for estimating, and optimizing policies
@@ -169,7 +169,7 @@ def gradient_mc(transition: Transition,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeSAL(transition, random_state, policy, gamma=gamma)
+    model = ModelFreeSL(transition, random_state, policy, gamma=gamma)
     vh, qh, samples = _gradient_mc(model, v_hat, state_0, action_0,
         alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
@@ -221,7 +221,7 @@ def semigrad_tdn(transition: Transition,
                  max_steps: int=MAX_STEPS,
                  samples: int=1000,
                  optimize: bool=False,
-                 policy: ModelFreeSALPolicy=None,
+                 policy: ModelFreeSLPolicy=None,
                  tol: float=TOL,
                  eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Semi-Gradient n-step Temporal Difference
@@ -297,7 +297,7 @@ def semigrad_tdn(transition: Transition,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeSAL(transition, random_state, policy, gamma=gamma)
+    model = ModelFreeSL(transition, random_state, policy, gamma=gamma)
     v, q, samples = _semigrad_tdn(model, v_hat, state_0, action_0,
         alpha, n, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
@@ -376,7 +376,7 @@ def lstd(transition: Transition,
          max_steps: int=MAX_STEPS, 
          samples: int=1000, 
          optimize: bool=False, 
-         policy: ModelFreeSALPolicy=None, 
+         policy: ModelFreeSLPolicy=None, 
          tol: float=TOL, eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Least squares n-step temporal differnece
     
@@ -437,7 +437,7 @@ def lstd(transition: Transition,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeSAL(transition, random_state, policy, gamma=gamma)
+    model = ModelFreeSL(transition, random_state, policy, gamma=gamma)
     v, q, samples = _lstd(model, state_0, action_0,
         alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 

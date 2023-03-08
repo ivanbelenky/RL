@@ -61,3 +61,4 @@ if __name__ == "__main__":
     vqpi_mc, samples_mc = gradient_mc(mountain_car, state_generator, ACTIONS,
         vhat, q_hat=qhat, state_0=(0,0), action_0=0, n_episodes=500, 
         max_steps=1E4, alpha=0.1/8, eps=0.1, optimize=True)
+    

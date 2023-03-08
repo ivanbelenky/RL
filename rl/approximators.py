@@ -69,8 +69,8 @@ class Approximator(ABC):
         raise NotImplementedError
 
 
-class ModelFreeSALPolicy(Policy):
-    '''ModelFreeSALPolicy is for approximated methods what 
+class ModelFreeSLPolicy(Policy):
+    '''ModelFreeSLPolicy is for approximated methods what 
     ModelFreePolicy is for tabular methods.
 
     This policies are thought with tabular actions in mind, since
@@ -91,7 +91,7 @@ class ModelFreeSALPolicy(Policy):
         return self.actions[action_idx]
         
 
-class EpsSoftSALPolicy(ModelFreeSALPolicy):
+class EpsSoftSALPolicy(ModelFreeSLPolicy):
     def __init__(self, actions: Sequence[Any], q_hat: Approximator,
                  eps: float = 0.1):
         super().__init__(actions, q_hat)
@@ -103,12 +103,12 @@ class EpsSoftSALPolicy(ModelFreeSALPolicy):
         return super().__call__(state)
     
 
-class ModelFreeSAL:
+class ModelFreeSL:
     '''
-    ModelFreeSAL stands for Model Free State-Action less, this is 
+    ModelFreeSL stands for Model Free Stateless, this is 
     to approximate methods what ModelFree is to tabular ones.
 
-    ModelFreeSAL is used mostly internally for the seek of readability
+    ModelFreeSL is used mostly internally for the seek of readability
     on solvers, but can be used standalone as well. The usual case
     for this is when you want to generate arbitrary episodes for a
     specific environment. This class will stand in between of the
@@ -118,7 +118,7 @@ class ModelFreeSAL:
     '''
 
     def __init__(self, transition: Callable, rand_state: Callable, 
-                 policy: ModelFreeSALPolicy, gamma: float = 1): 
+                 policy: ModelFreeSLPolicy, gamma: float = 1): 
         self.policy = policy
         self.rand_state = rand_state
         self.transition = transition
@@ -132,7 +132,7 @@ class ModelFreeSAL:
     def generate_episode(self, 
                          s_0: Any, 
                          a_0: Any, 
-                         policy: ModelFreeSALPolicy=None, 
+                         policy: ModelFreeSLPolicy=None, 
                          max_steps: int=MAX_STEPS) -> List[EpisodeStep]:
         '''Generate an episode using given policy if any, otherwise
         use the one defined as the attribute'''
