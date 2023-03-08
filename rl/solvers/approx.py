@@ -177,7 +177,7 @@ def gradient_mc(transition: Transition,
     
 
 def _gradient_mc(MFS, v_hat, s_0, a_0, alpha, n_episodes, 
-    max_steps, tol, optimize, sample_step):
+                 max_steps, tol, optimize, sample_step):
 
     α, γ, π = alpha, MFS.gamma, MFS.policy
     q_hat = π.q_hat
@@ -305,7 +305,7 @@ def semigrad_tdn(transition: Transition,
 
 
 def _semigrad_tdn(MFS, v_hat, s_0, a_0, alpha, n, n_episodes, max_steps, 
-    tol, optimize, sample_step):
+                  tol, optimize, sample_step):
     '''Semi gradient n-step temporal difference
 
     DRY but clear.
@@ -447,3 +447,150 @@ def lstd(transition: Transition,
 def _lstd(MF, s_0, a_0, alpha, n_episodes, max_steps, tol, optimize, sample_step):
 
     raise NotImplementedError
+
+
+def diff_semigradn(self,
+                   transition: Transition,
+                   random_state: Callable[[Any], Any],
+                   v_hat: SGDWA,
+                   q_hat: SGDWA=None,
+                   actions: Sequence[Any]=None,
+                   state_0: Any=None,
+                   action_0: Any=None,
+                   alpha: float=0.1,
+                   beta: float=0.1,
+                   n: int=1,
+                   T: int=1E5,
+                   samples: int=1000,
+                   optimize: bool=False,
+                   policy: ModelFreeSLPolicy=None,
+                   tol: float=TOL,
+                   eps: float=None) -> Tuple[AVQPi, Samples]:
+    '''Differential semi gradient n-step Sarsa for estimation and control.
+
+    The average reward setting is one of that comes to solve many problems
+    related with discounted settings with function approximation. The average
+    reward setting evaluates the quality of a policy by the average rate of reward. 
+    That is how good you expect the reward to be in average. 
+
+    Parameters
+    ----------
+    transition : Callable[[Any,Any],[[Any,float], bool]]]
+        transition must be a callable function that takes as arguments the
+        (state, action) and returns (new_state, reward), end.
+    random_state : Callable[[Any], Any]
+        random state generator
+    v_hat : SGDWA
+        Function approximator to use for the state value function
+    q_hat: SGDWA, optional
+        Function approximator to use for the action-value function, by default None
+        and will be replaced by a mocked version of q_hat where a one hot 
+        encoding is going to get appended to the state vector.
+    actions: Sequence[Any]
+        Sequence of possible actions
+    state_0 : Any, optional
+        Initial state, by default None (random)
+    action_0 : Any, optional
+        Initial action, by default None (random)
+    alpha : float, optional
+        Learning rate, by default 0.1
+    beta : float, optional
+        Step size for average reward updates, by default 0.1
+    n : int, optional
+        Number of steps to look ahead, by default 1
+    T : int, optional
+        Number of time steps to simulate, by default 1E5
+    samples : int, optional
+        Number of samples to take, by default 1000
+    optimize : bool, optional
+        Whether to optimize the policy or not, by default False
+    policy : ModelFreePolicy, optional
+        Policy to use, by default equal probability ModelFreePolicy
+    tol : float, optional
+        Tolerance for estimating convergence estimations
+    eps : float, optional
+        Epsilon value for the epsilon-soft policy, by default None (no exploration)
+    
+    Returns
+    -------
+    vqpi : Tuple[VPi, QPi, Policy]
+        Value function, action-value function, policy and samples if any.
+    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]] 
+        Samples taken during the simulation if any. The first element is the
+        index of the iteration, the second is the value function, the third is
+        the action-value function and the fourth is the Policy.
+
+    Raises
+    ------
+    TransitionError: If any of the arguments is not of the correct type.
+    '''
+    policy = _set_policy(policy, eps, actions, v_hat, q_hat)
+
+    _typecheck_all(transition=transition,
+        constants=[alpha, beta, T, samples, tol],
+        booleans=[optimize], policies=[policy])
+
+    _check_ranges(values=[alpha, beta, T, samples],
+        ranges=[(0,1), (0,1), (1,np.inf), (1,1001)])
+
+    sample_step = _get_sample_step(samples, T)
+
+    model = ModelFreeSL(transition, random_state, policy)
+    vh, qh, samples = _diff_semigrad(model, v_hat, state_0, action_0,
+        alpha, beta, n, int(T), tol, optimize, sample_step)
+
+    return AVQPi(vh, qh, policy), samples    
+
+
+def _diff_semigrad(MFS, v_hat, s_0, a_0, alpha, beta, n, T, tol, 
+                   optimize, sample_step):
+    '''
+    DRY but clear. Beta greek letter is written as  
+    '''
+    α, β, π = alpha, beta, MFS.policy
+    q_hat = π.q_hat
+
+    samples, dnorm = [], TOL*2
+    s, a = _set_s0_a0(MFS, s_0, a_0)
+
+    w_old = v_hat.w.copy()
+
+    R, A, S, avg_R = [], [a], [s], 0
+    for t in tqdm(range(T), desc=f'semigrad-TD', unit='episodes'):
+        if dnorm < tol:
+            break
+        
+        (s, r), end = MFS.step_transition(s, a)
+        R.append(r)
+        S.append(s)
+        if end:
+            break
+        else:
+            a = π(s)
+            A.append(a)
+    
+        if t - n + 1 >= 0:
+            rr = np.array(R)
+            R_R = rr.sum() - avg_R*n
+            δ_v = R_R + v_hat(S[n]) - v_hat(S[0])
+            δ_q = R_R + q_hat((S[n], A[n])) - q_hat((S[0], A[0]))
+
+            avg_R = avg_R + beta*δ_q
+
+            s_t = S[0]
+            a_t = A[0]
+            
+            v_hat.update(δ_v, α, s_t)
+            if optimize:
+                q_hat.update(δ_q, α, (s_t, a_t))
+
+            R.pop(0)
+            A.pop(0)
+            S.pop(0)
+    
+        dnorm = lnorm(w_old - v_hat.w)
+
+        if t % sample_step == 0:
+            samples.append(get_sample(v_hat, q_hat, π, t, optimize))
+
+    return v_hat, q_hat, samples
