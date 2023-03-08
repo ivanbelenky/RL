@@ -179,28 +179,24 @@ class SGDWA(Approximator):
         self.basis = basis if basis else lambda x: x
         self.w = np.ones(self.fs)*W_INIT
 
-    def grad(self, x: Any, *args, **kwargs) -> np.ndarray:
+    def grad(self, x: Any) -> np.ndarray:
         '''Return the gradient of the approximation'''
-        raise NotImplementedError
+        return self.basis(x)
 
     def delta_w(self, U: float, alpha: float, x: Any) -> np.ndarray:
         return alpha * (U - self(x)) * self.grad(x)
 
-    def copy(self):
-        return copy.deepcopy(self)
-        
-
-class LinearApproximator(SGDWA):
-    '''Linear approximator for arbitrary finite dimension state space'''
-    def grad(self, x: Any) -> np.ndarray:
-        '''Pretty straightforward grad'''
-        return self.basis(x)
-
     def update(self, U: float, alpha: float, x: Any) -> np.ndarray:
         '''Updates inplace the weight vector and returns it just in case'''
-        dw = super().delta_w(U, alpha, x)
+        dw = self.delta_w(U, alpha, x)
         self.w = self.w + dw
         return dw
 
     def __call__(self, x):
         return np.dot(self.w, self.basis(x))
+
+    def copy(self):
+        return copy.deepcopy(self)
+        
+
+LinearApproximator = SGDWA
