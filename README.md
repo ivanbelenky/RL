@@ -65,7 +65,7 @@ The code in this repository is organized into several modules, each of which cov
 - [ ] Elegibility Traces
   - [x] TD($\lambda$)
   - [ ] True Online
-  - [ ] Sarsa($\lambda$) 
+  - [x] Sarsa($\lambda$) 
   - [ ] True Online Sarsa($\lambda$)
   
 <br>

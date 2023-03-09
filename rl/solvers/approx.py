@@ -704,7 +704,9 @@ def _td_lambda(MFS, v_hat, s_0, a_0, alpha, lambdaa, n_episodes, max_steps, tol,
             break
         s, a = _set_s0_a0(MFS, s_0, a_0)
 
-        z = np.zeros_like(v_hat.w)
+        zv = np.zeros_like(v_hat.w)
+        zq = np.zeros_like(q_hat.w)
+
         w_old = v_hat.w.copy()
 
         T = int(max_steps)
@@ -714,14 +716,15 @@ def _td_lambda(MFS, v_hat, s_0, a_0, alpha, lambdaa, n_episodes, max_steps, tol,
                 break
             else:
                 a = π(s)
-            z = γ*λ*z + v_hat.grad(s)
+            zv = γ*λ*zv + v_hat.grad(s)
+            zq = γ*λ*zq + q_hat.grad((s, a))
             Uv = r + γ*v_hat(s_)
-            #Uq 
+            Uq = r + γ*q_hat(s_, a) 
 
-            v_hat.et_update(Uv, α, s, z)
+            v_hat.et_update(Uv, α, s, zv)
             
-            #if optimize:
-            #    q_hat.et_update(Uv, α, (s_t, a_t))
+            if optimize:
+                q_hat.et_update(Uq, α, (s, a), zq)
 
             s = s_
 
