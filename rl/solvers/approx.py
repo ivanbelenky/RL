@@ -1,5 +1,5 @@
 from abc import ABC, abstractclassmethod
-from typing import Sequence, Callable, Tuple, Any, NewType
+from typing import Sequence, Callable, Tuple, Optional, Any, NewType
 from copy import deepcopy
 
 import numpy as np
@@ -592,5 +592,143 @@ def _diff_semigrad(MFS, v_hat, s_0, a_0, alpha, beta, n, T, tol,
 
         if t % sample_step == 0:
             samples.append(get_sample(v_hat, q_hat, π, t, optimize))
+
+    return v_hat, q_hat, samples
+
+
+def semigrad_td_lambda(transition: Transition,
+                       random_state: Callable,
+                       v_hat: SGDWA,
+                       q_hat: SGDWA=None,
+                       actions: Sequence[Any]=None,
+                       state_0: Any=None,
+                       action_0: Any=None,
+                       alpha: float=0.1,
+                       lambdaa: float=0.1,
+                       gamma: float=0.9,
+                       n_episodes: int=1E5,
+                       max_steps: int=1E3,
+                       samples: int=1000,
+                       optimize: bool=False,
+                       policy: ModelFreeSLPolicy=None,
+                       tol: float=TOL,
+                       eps: float=None) -> Tuple[AVQPi, Samples]:
+    '''Semi-gradient TD(λ).
+
+    Eligibility traces semi gradient TD(λ). This algorithms extends more 
+    generally to TD and MC. It also improves off-line λ-return algorithms following
+    the forward view, alas backward view. It updates the weight vector on every step,
+    improving sooner, and computations are equally distributed among the time steps.
+    Also it can be applied to continuing problems rather than just episodic ones.  
+
+    Parameters
+    ----------
+    transition : Callable[[Any,Any],[[Any,float], bool]]]
+        transition must be a callable function that takes as arguments the
+        (state, action) and returns (new_state, reward), end.
+    random_state : Callable[[Any], Any]
+        random state generator
+    v_hat : SGDWA
+        Function approximator to use for the state value function
+    q_hat: SGDWA, optional
+        Function approximator to use for the action-value function, by default None
+        and will be replaced by a mocked version of q_hat where a one hot 
+        encoding is going to get appended to the state vector.
+    actions: Sequence[Any]
+        Sequence of possible actions
+    state_0 : Any, optional
+        Initial state, by default None (random)
+    action_0 : Any, optional
+        Initial action, by default None (random)
+    alpha : float, optional
+        Learning rate, by default 0.1
+    lambdaa : float, optional
+        Learning rate, by default 0.1
+    gamma : float, optional
+        Step size for average reward updates, by default 0.1
+    n_episodes : int, optional
+        Number of time steps to simulate, by default 1E5
+    max_steps : int, optional
+        Maximum number of steps per episode, by default 1000
+    samples : int, optional
+        Number of samples to take, by default 1000
+    optimize : bool, optional
+        Whether to optimize the policy or not, by default False
+    policy : ModelFreePolicy, optional
+        Policy to use, by default equal probability ModelFreePolicy
+    tol : float, optional
+        Tolerance for estimating convergence estimations
+    eps : float, optional
+        Epsilon value for the epsilon-soft policy, by default None (no exploration)
+    
+    Returns
+    -------
+    vqpi : Tuple[VPi, QPi, Policy]
+        Value function, action-value function, policy and samples if any.
+    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]] 
+        Samples taken during the simulation if any. The first element is the
+        index of the iteration, the second is the value function, the third is
+        the action-value function and the fourth is the Policy.
+
+    Raises
+    ------
+    TransitionError: If any of the arguments is not of the correct type.
+    '''
+    policy = _set_policy(policy, eps, actions, v_hat, q_hat)
+
+    _typecheck_all(transition=transition,
+        constants=[alpha, gamma, lambdaa, n_episodes, samples, tol],
+        booleans=[optimize], policies=[policy])
+
+    _check_ranges(values=[alpha, gamma, lambdaa, n_episodes, samples],
+        ranges=[(0,1), (0,1), (0,1), (1,np.inf), (1,1001)])
+
+    sample_step = _get_sample_step(samples, T)
+
+    model = ModelFreeSL(transition, random_state, policy)
+    vh, qh, samples = _diff_semigrad(model, v_hat, state_0, action_0, alpha, 
+        lambdaa, int(n_episodes), int(max_steps), tol, optimize, sample_step)
+
+    return AVQPi(vh, qh, policy), samples    
+
+
+def _td_lambda(MFS, v_hat, s_0, a_0, alpha, lambdaa, n_episodes, max_steps, tol, 
+               sample_step, optimize):
+    '''DRY but clear.'''
+    α, γ, π, λ = alpha, MFS.gamma, MFS.policy, lambdaa
+    q_hat = π.q_hat
+
+    samples, dnorm = [], TOL*2
+    for n_episode in tqdm(range(n_episodes), desc=f'semigrad-TD', unit='episodes'):
+        if dnorm < tol:
+            break
+        s, a = _set_s0_a0(MFS, s_0, a_0)
+
+        z = np.zeros_like(v_hat.w)
+        w_old = v_hat.w.copy()
+
+        T = int(max_steps)
+        for _ in range(T):
+            (s_, r), end = MFS.step_transition(s, a)
+            if end:
+                break
+            else:
+                a = π(s)
+            z = γ*λ*z + v_hat.grad(s)
+            Uv = r + γ*v_hat(s_)
+            #Uq 
+
+            v_hat.et_update(Uv, α, s, z)
+            
+            #if optimize:
+            #    q_hat.et_update(Uv, α, (s_t, a_t))
+
+            s = s_
+
+        dnorm = lnorm(w_old - v_hat.w)
+            
+        if n_episode % sample_step == 0:
+            samples.append(get_sample(v_hat, q_hat, π, n_episode, optimize))
+        n_episode += 1
 
     return v_hat, q_hat, samples

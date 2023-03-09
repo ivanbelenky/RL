@@ -199,12 +199,19 @@ class SGDWA(Approximator):
         '''Return the gradient of the approximation'''
         return self.basis(x)
 
-    def delta_w(self, U: float, alpha: float, x: Any) -> np.ndarray:
-        return alpha * (U - self(x)) * self.grad(x)
+    def delta_w(self, U: float, alpha: float, x: Any, g: np.ndarray) -> np.ndarray:
+        '''g: vector value, either gradient or elegibility trace'''
+        return alpha * (U - self(x)) * g
+
+    def et_update(self, U: float, alpha: float, x: Any, z: np.ndarray) -> np.ndarray:
+        '''Updates inplace with elegibility traces the weight vector'''
+        dw = self.delta_w(U, alpha, x, z)
+        self.w = self.w + dw
+        return dw
 
     def update(self, U: float, alpha: float, x: Any) -> np.ndarray:
-        '''Updates inplace the weight vector and returns it just in case'''
-        dw = self.delta_w(U, alpha, x)
+        '''Updates inplace the weight vector and returns update just in case'''
+        dw = self.delta_w(U, alpha, x, self.grad(x))
         self.w = self.w + dw
         return dw
 

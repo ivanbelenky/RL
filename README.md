@@ -62,7 +62,12 @@ The code in this repository is organized into several modules, each of which cov
   - [x] Episodic semi-gradient
   - [x] Semi-gradient n-step Sarsa
   - [x] Differential Semi-gradient n-step Sarsa
-
+- [ ] Elegibility Traces
+  - [x] TD($\lambda$)
+  - [ ] True Online
+  - [ ] Sarsa($\lambda$) 
+  - [ ] True Online Sarsa($\lambda$)
+  
 <br>
 
 All model free solvers will work just by defining `states` `actions` and a `trasition` function. Transitions are defined as a function that takes a state and an action and returns a tuple of the next state and the reward. The transition function also returns a boolean indicating whether the episode has terminated.
