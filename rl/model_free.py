@@ -19,15 +19,11 @@ from rl.utils import (
     State, 
     Action,
     StateAction,
+    TransitionException,
     EpisodeStep, 
     MAX_ITER, 
     MAX_STEPS
 )
-
-
-class TransitionException(Exception):
-    pass
-
 
 class ModelFreePolicy(Policy):
     def __init__(self, A: Union[Sequence[Any], int], S: Union[Sequence[Any], int]):

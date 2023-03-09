@@ -92,6 +92,9 @@ Samples = NewType('Samples', Tuple[int, List[Vpi], List[Qpi], List[Policy]])
 Transition = Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
 EpisodeStep = NewType('EpisodeStep', Tuple[int, int, float])
 
+class TransitionException(Exception):
+    pass
+
 class PQueue:
     '''Priority Queue'''
     def __init__(self, items: List[Tuple[float, Any]]):

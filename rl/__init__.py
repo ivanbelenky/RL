@@ -1,8 +1,7 @@
 from .model_free import (
     ModelFree, 
     ModelFreePolicy, 
-    EpsilonSoftPolicy, 
-    TransitionException
+    EpsilonSoftPolicy
 )
 from .solvers.model_based import (
     vq_pi_iter_naive, 
@@ -27,6 +26,8 @@ from .solvers.approx import (
     semigrad_tdn
 )
 from .tiles import IHT, tiles
+
+from .utils import TransitionException
 
 __all__ = [
     'ModelFree',

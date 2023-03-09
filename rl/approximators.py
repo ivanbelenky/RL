@@ -1,4 +1,6 @@
 import copy
+import time
+from time import perf_counter
 from abc import ABC, abstractmethod
 from typing import (
     Optional, 
@@ -15,6 +17,8 @@ import numpy as np
 
 from rl.utils import (
     Policy, 
+    Transition,
+    TransitionException,
     EpisodeStep, 
     W_INIT, 
     MAX_ITER, 
@@ -117,12 +121,24 @@ class ModelFreeSL:
     runtime executions.
     '''
 
-    def __init__(self, transition: Callable, rand_state: Callable, 
+    def __init__(self, transition: Transition, rand_state: Callable,
                  policy: ModelFreeSLPolicy, gamma: float = 1): 
         self.policy = policy
         self.rand_state = rand_state
         self.transition = transition
         self.gamma = gamma
+        self._validate_transition()
+
+    def _validate_transition(self):
+        start = perf_counter()
+        while perf_counter() - start < 2:
+            rand_s = self.rand_state()
+            rand_a = np.random.choice(self.policy.actions)
+            try:
+                self.transition(rand_s, rand_a)
+            except Exception as e:
+                raise TransitionException(
+                    f'Transition function is not valid: {e}')
         
     def random_sa(self):
         a = np.random.choice(self.policy.actions)
