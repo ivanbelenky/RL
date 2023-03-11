@@ -23,7 +23,11 @@ from .solvers.planning import (
 )
 from .solvers.approx import (
     gradient_mc, 
-    semigrad_tdn
+    semigrad_tdn,
+    lstd,
+    semigrad_td_lambda,
+    diff_semigradn,
+    reinforce_mc
 )
 from .tiles import IHT, tiles
 
@@ -48,6 +52,10 @@ __all__ = [
     'rtdp',
     'gradient_mc',
     'semigrad_tdn',
+    'lstd',
+    'semigrad_td_lambda',
+    'diff_semigradn',
+    'reinforce_mc',
     'Tile',
     'tiles'
 ]

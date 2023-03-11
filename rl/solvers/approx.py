@@ -1,6 +1,14 @@
 from abc import ABC, abstractclassmethod
-from typing import Sequence, Callable, Tuple, Optional, Any, NewType
 from copy import deepcopy
+from typing import (
+    Sequence, 
+    Callable, 
+    Tuple, 
+    Optional, 
+    List,
+    Any, 
+    NewType
+)
 
 import numpy as np
 from numpy.linalg import norm as lnorm
@@ -9,9 +17,10 @@ from tqdm import tqdm
 from rl.approximators import (
     Approximator, 
     SGDWA, 
-    ModelFreeSL, 
-    ModelFreeSLPolicy,
-    EpsSoftSALPolicy
+    ModelFreeTL, 
+    ModelFreeTLPolicy,
+    EpsSoftSALPolicy,
+    REINFORCEPolicy
 )
 from rl.utils import (
     _typecheck_all,
@@ -25,7 +34,7 @@ from rl.utils import (
 )
 
 class AVQPi:
-    def __init__(self, v: Approximator, q: Approximator, pi: ModelFreeSLPolicy):
+    def __init__(self, v: Approximator, q: Approximator, pi: ModelFreeTLPolicy):
         self.v_hat = v
         self.q = q
         self.pi = pi
@@ -79,7 +88,7 @@ def _set_policy(policy, eps, actions, v_hat, q_hat):
             _check_ranges(values=[eps], ranges=[(0,1)])
             policy = EpsSoftSALPolicy(actions, q_hat, eps=eps)
         else:
-            policy = ModelFreeSLPolicy(actions, q_hat)
+            policy = ModelFreeTLPolicy(actions, q_hat)
     return policy
 
 
@@ -96,7 +105,7 @@ def gradient_mc(transition: Transition,
                 max_steps: int=MAX_STEPS, 
                 samples: int=1000, 
                 optimize: bool=False,
-                policy: ModelFreeSLPolicy=None, 
+                policy: ModelFreeTLPolicy=None, 
                 tol: float=TOL, 
                 eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Gradient α-MC algorithm for estimating, and optimizing policies
@@ -169,7 +178,7 @@ def gradient_mc(transition: Transition,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeSL(transition, random_state, policy, gamma=gamma)
+    model = ModelFreeTL(transition, random_state, policy, gamma=gamma)
     vh, qh, samples = _gradient_mc(model, v_hat, state_0, action_0,
         alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
@@ -221,7 +230,7 @@ def semigrad_tdn(transition: Transition,
                  max_steps: int=MAX_STEPS,
                  samples: int=1000,
                  optimize: bool=False,
-                 policy: ModelFreeSLPolicy=None,
+                 policy: ModelFreeTLPolicy=None,
                  tol: float=TOL,
                  eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Semi-Gradient n-step Temporal Difference
@@ -297,7 +306,7 @@ def semigrad_tdn(transition: Transition,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeSL(transition, random_state, policy, gamma=gamma)
+    model = ModelFreeTL(transition, random_state, policy, gamma=gamma)
     v, q, samples = _semigrad_tdn(model, v_hat, state_0, action_0,
         alpha, n, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
@@ -376,7 +385,7 @@ def lstd(transition: Transition,
          max_steps: int=MAX_STEPS, 
          samples: int=1000, 
          optimize: bool=False, 
-         policy: ModelFreeSLPolicy=None, 
+         policy: ModelFreeTLPolicy=None, 
          tol: float=TOL, eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Least squares n-step temporal differnece
     
@@ -437,7 +446,7 @@ def lstd(transition: Transition,
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeSL(transition, random_state, policy, gamma=gamma)
+    model = ModelFreeTL(transition, random_state, policy, gamma=gamma)
     v, q, samples = _lstd(model, state_0, action_0,
         alpha, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
@@ -449,8 +458,7 @@ def _lstd(MF, s_0, a_0, alpha, n_episodes, max_steps, tol, optimize, sample_step
     raise NotImplementedError
 
 
-def diff_semigradn(self,
-                   transition: Transition,
+def diff_semigradn(transition: Transition,
                    random_state: Callable[[Any], Any],
                    v_hat: SGDWA,
                    q_hat: SGDWA=None,
@@ -463,7 +471,7 @@ def diff_semigradn(self,
                    T: int=1E5,
                    samples: int=1000,
                    optimize: bool=False,
-                   policy: ModelFreeSLPolicy=None,
+                   policy: ModelFreeTLPolicy=None,
                    tol: float=TOL,
                    eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Differential semi gradient n-step Sarsa for estimation and control.
@@ -535,7 +543,7 @@ def diff_semigradn(self,
 
     sample_step = _get_sample_step(samples, T)
 
-    model = ModelFreeSL(transition, random_state, policy)
+    model = ModelFreeTL(transition, random_state, policy)
     vh, qh, samples = _diff_semigrad(model, v_hat, state_0, action_0,
         alpha, beta, n, int(T), tol, optimize, sample_step)
 
@@ -575,7 +583,7 @@ def _diff_semigrad(MFS, v_hat, s_0, a_0, alpha, beta, n, T, tol,
             δ_v = R_R + v_hat(S[n]) - v_hat(S[0])
             δ_q = R_R + q_hat((S[n], A[n])) - q_hat((S[0], A[0]))
 
-            avg_R = avg_R + beta*δ_q
+            avg_R = avg_R + β*δ_q
 
             s_t = S[0]
             a_t = A[0]
@@ -610,7 +618,7 @@ def semigrad_td_lambda(transition: Transition,
                        max_steps: int=1E3,
                        samples: int=1000,
                        optimize: bool=False,
-                       policy: ModelFreeSLPolicy=None,
+                       policy: ModelFreeTLPolicy=None,
                        tol: float=TOL,
                        eps: float=None) -> Tuple[AVQPi, Samples]:
     '''Semi-gradient TD(λ).
@@ -685,8 +693,8 @@ def semigrad_td_lambda(transition: Transition,
 
     sample_step = _get_sample_step(samples, T)
 
-    model = ModelFreeSL(transition, random_state, policy)
-    vh, qh, samples = _diff_semigrad(model, v_hat, state_0, action_0, alpha, 
+    model = ModelFreeTL(transition, random_state, policy)
+    vh, qh, samples = _td_lambda(model, v_hat, state_0, action_0, alpha, 
         lambdaa, int(n_episodes), int(max_steps), tol, optimize, sample_step)
 
     return AVQPi(vh, qh, policy), samples    
@@ -735,3 +743,108 @@ def _td_lambda(MFS, v_hat, s_0, a_0, alpha, lambdaa, n_episodes, max_steps, tol,
         n_episode += 1
 
     return v_hat, q_hat, samples
+
+
+def reinforce_mc(transition: Transition,
+                 random_state: Callable,
+                 pi_hat: Approximator,
+                 actions: Sequence[Any]=None,
+                 state_0: Any=None,
+                 action_0: Any=None,
+                 alpha: float=0.1,
+                 gamma: float=0.9,
+                 n_episodes: int=MAX_ITER,
+                 max_steps: int=MAX_STEPS,
+                 samples: int=1000,
+                 policy: REINFORCEPolicy=None,
+                 tol: float=TOL) -> Tuple[REINFORCEPolicy, List[REINFORCEPolicy]]:
+    '''MC Policy-Gradient control algorithm
+
+    This algorithm must be used with differentiable policies. Regardless of the 
+    approximator the parameter for the latter is optimized via SGD. For more
+    information check p.328 chapter 13.3.
+
+    Parameters
+    ----------
+    transition : Callable[[Any,Any],[[Any,float], bool]]]
+        transition must be a callable function that takes as arguments the
+        (state, action) and returns (new_state, reward), end.
+    random_state : Callable[[Any], Any]
+        random state generator
+    pi_hat : SGDWA
+        Function approximator to use for the state value function. Wont be 
+        used even if specified if policy is provided
+    actions: Sequence[Any]
+        Sequence of possible actions
+    state_0 : Any, optional
+        Initial state, by default None (random)
+    action_0 : Any, optional
+        Initial action, by default None (random)
+    alpha : float, optional
+        Learning rate, by default 0.1
+    gamma : float, optional
+        Step size for average reward updates, by default 0.1
+    n_episodes : int, optional
+        Number of time steps to simulate, by default 1E5
+    max_steps : int, optional
+        Maximum number of steps per episode, by default 1000
+    samples : int, optional
+        Number of samples to take, by default 1000
+    policy : ModelFreePolicy, optional
+        Policy to use, by default equal probability ModelFreePolicy
+    tol : float, optional
+        Tolerance for estimating convergence estimations
+    
+    Returns
+    -------
+    pi : REINFORCEPolicy
+        Value function, action-value function, policy and samples if any.
+    samples : List[REINFORCEPolicy] 
+        Samples taken during the simulation if any for the differentiable policy.
+
+    Raises
+    ------
+    TransitionError: If any of the arguments is not of the correct type.
+    '''
+    policy = policy if policy else REINFORCEPolicy(actions, pi_hat)
+
+    _typecheck_all(transition=transition, constants=[alpha, gamma, n_episodes, samples, tol], 
+                   policies=[policy])
+
+    _check_ranges(values=[alpha, gamma, n_episodes, samples],
+        ranges=[(0,1), (0,1), (1,np.inf), (1,1001)])
+
+    sample_step = _get_sample_step(samples, n_episodes)
+
+    model = ModelFreeTL(transition, random_state, policy)
+    pi, samples = _reinforce_mc(model, state_0, action_0, alpha, 
+        int(n_episodes), int(max_steps), tol, sample_step)
+
+    return pi, samples 
+
+
+def _reinforce_mc(MFS, s_0, a_0, alpha, n_episodes, max_steps, tol, 
+                  sample_step):
+    ''''not returning the usual sample set'''
+    α, γ, π = alpha, MFS.gamma, MFS.policy
+    gammatron = np.array([γ**i for i in range(max_steps)])
+    samples, dnorm = [], TOL*2
+    for n_episode in tqdm(range(n_episodes), desc=f'MC Policy Gradient', unit='episodes'):
+        s, a = _set_s0_a0(MFS, s_0, a_0)
+        theta_old = deepcopy(π.w)
+        episode = MFS.generate_episode(s, a, π, max_steps)
+        rr = np.array([r for _, _, r in episode])
+        for t, (s, a, r) in enumerate(episode):
+            G = gammatron[:len(episode)-t].dot(rr[t:])
+            c = α*G*(γ**t)
+            π.update_policy(c, s, a)
+        
+        if n_episode % sample_step == 0:
+            samples.append(deepcopy(π))
+
+        dnorm = lnorm(π.w - theta_old)
+        if dnorm < tol:
+            break
+
+    return π, samples
+        

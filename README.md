@@ -67,7 +67,10 @@ The code in this repository is organized into several modules, each of which cov
   - [ ] True Online
   - [x] Sarsa($\lambda$) 
   - [ ] True Online Sarsa($\lambda$)
-  
+- [ ] Policy Gradient
+  - [x] REINFORCE: Monte Carlo Policy Gradient w/wo Baseline
+  - [ ] Actor-Critic (episodic) w/wo eligibility traces
+  - [ ] Actor-Critic (continuing) with eligibility traces
 <br>
 
 All model free solvers will work just by defining `states` `actions` and a `trasition` function. Transitions are defined as a function that takes a state and an action and returns a tuple of the next state and the reward. The transition function also returns a boolean indicating whether the episode has terminated.

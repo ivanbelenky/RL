@@ -19,7 +19,7 @@ from rl.utils import (
     Policy, 
     Transition,
     TransitionException,
-    EpisodeStep, 
+    EpisodeStep,
     W_INIT, 
     MAX_ITER, 
     MAX_STEPS
@@ -27,8 +27,7 @@ from rl.utils import (
 
 '''
 All of this may change if the policy gradient methods are
-similar to this implementation. Adding probably an `optimize`
-keyword argument.
+similar to this implementation.
 
 SGD and Semi Gradient Linear methods:
 
@@ -67,14 +66,18 @@ class Approximator(ABC):
         '''Update the approximator'''
         raise NotImplementedError
 
-    @abstractmethod
     def copy(self, *args, **kwargs) -> Any:
         '''Return a copy of the approximator'''
-        raise NotImplementedError
+        return copy.deepcopy(self)
 
+    def is_differentiable(self):
+        grad = getattr(self, "grad", None)
+        if grad:
+            return True
+        return False
 
-class ModelFreeSLPolicy(Policy):
-    '''ModelFreeSLPolicy is for approximated methods what 
+class ModelFreeTLPolicy(Policy):
+    '''ModelFreeTLPolicy is for approximated methods what 
     ModelFreePolicy is for tabular methods.
 
     This policies are thought with tabular actions in mind, since
@@ -95,7 +98,7 @@ class ModelFreeSLPolicy(Policy):
         return self.actions[action_idx]
         
 
-class EpsSoftSALPolicy(ModelFreeSLPolicy):
+class EpsSoftSALPolicy(ModelFreeTLPolicy):
     def __init__(self, actions: Sequence[Any], q_hat: Approximator,
                  eps: float = 0.1):
         super().__init__(actions, q_hat)
@@ -107,12 +110,35 @@ class EpsSoftSALPolicy(ModelFreeSLPolicy):
         return super().__call__(state)
     
 
-class ModelFreeSL:
+class REINFORCEPolicy(ModelFreeTLPolicy):    
+    def __init__(self, actions: Sequence[Any], pi_hat: Approximator):
+        '''Must be a differential approximator'''
+        self.actions = actions
+        self.pi_hat = pi_hat
+        self.w = self.pi_hat.w
+        if not self.pi_hat.is_differentiable():
+            raise TypeError("Policy approximator must be differentiable pi_hat")
+
+    def update_policy(self, c: float, s: Any, a: Any):
+        self.pi_hat.w += c*self.pi_hat.grad((s, a))/self.pi_hat((s, a))
+
+    def pi_sa(self, s: Any) -> np.ndarray:
+        e_hsa = [np.exp(self.pi_hat((s, a))) for a in self.actions]
+        denom = sum(e_hsa)
+        pi_sa = np.array([e_hsa[i]/denom for i in range(len(self.actions))])        
+        return pi_sa
+
+    def __call__(self, s: Any) -> float:
+        '''default softmax implementation'''
+        return np.random.choice(self.actions, p=self.pi_sa(s))
+
+
+class ModelFreeTL:
     '''
-    ModelFreeSL stands for Model Free Stateless, this is 
+    ModelFreeTL stands for Model Free Tabular Less, even if we have state,
     to approximate methods what ModelFree is to tabular ones.
 
-    ModelFreeSL is used mostly internally for the seek of readability
+    ModelFreeTL is used mostly internally for the seek of readability
     on solvers, but can be used standalone as well. The usual case
     for this is when you want to generate arbitrary episodes for a
     specific environment. This class will stand in between of the
@@ -122,7 +148,7 @@ class ModelFreeSL:
     '''
 
     def __init__(self, transition: Transition, rand_state: Callable,
-                 policy: ModelFreeSLPolicy, gamma: float = 1): 
+                 policy: ModelFreeTLPolicy, gamma: float = 1): 
         self.policy = policy
         self.rand_state = rand_state
         self.transition = transition
@@ -148,7 +174,7 @@ class ModelFreeSL:
     def generate_episode(self, 
                          s_0: Any, 
                          a_0: Any, 
-                         policy: ModelFreeSLPolicy=None, 
+                         policy: ModelFreeTLPolicy=None, 
                          max_steps: int=MAX_STEPS) -> List[EpisodeStep]:
         '''Generate an episode using given policy if any, otherwise
         use the one defined as the attribute'''
@@ -169,13 +195,16 @@ class ModelFreeSL:
     def step_transition(self, state: Any, action: Any
     ) -> Tuple[Tuple[Any, float], bool]:    
         return self.transition(state, action)
-
+    
 
 class SGDWA(Approximator):
     '''Stochastic Gradient Descent Weight-Vector Approximator
+    for MSVE (mean square value error).
 
     Differentiable Value Function approximator dependent
-    on a weight vector. Must define a gradient method. 
+    on a weight vector. Must define a gradient method. Thought
+    to be less of a general case and more oriented toward the
+    mean square value error VE, the prediction objective.
     '''
     def __init__(self, 
                  fs:int=None,
@@ -218,8 +247,5 @@ class SGDWA(Approximator):
     def __call__(self, x):
         return np.dot(self.w, self.basis(x))
 
-    def copy(self):
-        return copy.deepcopy(self)
-        
 
 LinearApproximator = SGDWA
