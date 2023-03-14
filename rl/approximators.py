@@ -118,11 +118,19 @@ class REINFORCEPolicy(ModelFreeTLPolicy):
         if not self.pi_hat.is_differentiable():
             raise TypeError("Policy approximator pi_hat must be differentiable")
 
+    def grad_lnpi(self, s, a):
+        pi_sa = self.pi_sa(s).reshape(-1, 1)
+        grad_pi_sa = self.pi_hat.grad((s, a)).reshape(-1, 1)
+        grads_pi_sa = np.array([self.pi_hat.grad((s, a_i)) for a_i in self.actions])
+        return (grad_pi_sa - grads_pi_sa @ pi_sa).reshape(-1)
+
     def update_policy(self, c: float, s: Any, a: Any):
-        self.pi_hat.w += c*self.pi_hat.grad((s, a))/self.pi_hat((s, a))
+        self.pi_hat.w += c*self.grad_lnpi(s, a)
 
     def pi_sa(self, s: Any) -> np.ndarray:
-        e_hsa = [np.exp(self.pi_hat((s, a))) for a in self.actions]
+        pi_hat_sa = [self.pi_hat((s, a)) for a in self.actions]
+        max_sa = max(pi_hat_sa)
+        e_hsa = [np.exp(pi_hat_sa[i] - max_sa) for i in range(len(self.actions))]
         denom = sum(e_hsa)
         pi_sa = np.array([e_hsa[i]/denom for i in range(len(self.actions))])        
         return pi_sa
