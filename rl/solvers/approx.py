@@ -834,7 +834,7 @@ def _reinforce_mc(MFS, s_0, a_0, alpha, n_episodes, max_steps, tol,
         theta_old = deepcopy(π.w)
         episode = MFS.generate_episode(s, a, π, max_steps)
         rr = np.array([r for _, _, r in episode])
-        for t, (s, a, r) in enumerate(episode):
+        for t, (s, a, _) in enumerate(episode):
             G = gammatron[:len(episode)-t].dot(rr[t:])
             c = α*G*(γ**t)
             π.update_policy(c, s, a)
