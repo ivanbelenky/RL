@@ -823,15 +823,14 @@ def reinforce_mc(transition: Transition,
     return pi, samples 
 
 
-def _reinforce_mc(MFS, s_0, a_0, alpha, n_episodes, max_steps, tol, 
-                  sample_step):
+def _reinforce_mc(MFS, s_0, a_0, alpha, n_episodes, max_steps, tol, sample_step):
     ''''not returning the usual sample set'''
     α, γ, π = alpha, MFS.gamma, MFS.policy
     gammatron = np.array([γ**i for i in range(max_steps)])
     samples, dnorm = [], TOL*2
     for n_episode in tqdm(range(n_episodes), desc=f'MC Policy Gradient', unit='episodes'):
         s, a = _set_s0_a0(MFS, s_0, a_0)
-        theta_old = deepcopy(π.w)
+        theta_old = deepcopy(π.pi_hat.w)
         episode = MFS.generate_episode(s, a, π, max_steps)
         rr = np.array([r for _, _, r in episode])
         for t, (s, a, _) in enumerate(episode):
@@ -842,7 +841,7 @@ def _reinforce_mc(MFS, s_0, a_0, alpha, n_episodes, max_steps, tol,
         if n_episode % sample_step == 0:
             samples.append(deepcopy(π))
 
-        dnorm = lnorm(π.w - theta_old)
+        dnorm = lnorm(π.pi_hat.w - theta_old)
         if dnorm < tol:
             break
 

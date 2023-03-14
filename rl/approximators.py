@@ -115,9 +115,8 @@ class REINFORCEPolicy(ModelFreeTLPolicy):
         '''Must be a differential approximator'''
         self.actions = actions
         self.pi_hat = pi_hat
-        self.w = self.pi_hat.w
         if not self.pi_hat.is_differentiable():
-            raise TypeError("Policy approximator must be differentiable pi_hat")
+            raise TypeError("Policy approximator pi_hat must be differentiable")
 
     def update_policy(self, c: float, s: Any, a: Any):
         self.pi_hat.w += c*self.pi_hat.grad((s, a))/self.pi_hat((s, a))
