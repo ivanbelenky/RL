@@ -48,7 +48,7 @@ if __name__ == "__main__":
     SMOOTH = 100
     rewards = []
     for i in tqdm(range(SMOOTH)):
-        _rewards = []
+        _rewards = []   
         for policy in samples:
             a0 = policy(1)
             episode = model.generate_episode(1, a0, policy=policy, max_steps=100)

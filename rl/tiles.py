@@ -25,6 +25,8 @@ The first argument is either an index hash table of a given size (created by (ma
 an integer "size" (range of the indices from 0), or nil (for testing, indicating that the tile 
 coordinates are to be returned without being converted to indices).
 """
+from math import floor, log
+from itertools import zip_longest
 
 basehash = hash
 
@@ -42,13 +44,13 @@ class IHT:
                " overfullCount:" + str(self.overfullCount) + \
                " dictionary:" + str(len(self.dictionary)) + " items"
 
-    def count (self):
+    def count(self):
         return len(self.dictionary)
     
-    def fullp (self):
+    def fullp(self):
         return len(self.dictionary) >= self.size
     
-    def getindex (self, obj, readonly=False):
+    def getindex(self, obj, readonly=False):
         d = self.dictionary
         if obj in d: return d[obj]
         elif readonly: return None
@@ -67,8 +69,6 @@ def hashcoords(coordinates, m, readonly=False):
     if type(m)==int: return basehash(tuple(coordinates)) % m
     if m==None: return coordinates
 
-from math import floor, log
-from itertools import zip_longest
 
 def tiles(ihtORsize, numtilings, floats, ints=[], readonly=False):
     """returns num-tilings tile indices corresponding to the floats and ints"""
