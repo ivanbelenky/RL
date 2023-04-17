@@ -20,7 +20,6 @@ TOL = 5E-8
 MEAN_ITERS = int(1E4)
 W_INIT = 1E-3
 
-
 class Policy(ABC):
     def __init__(self):
         pass
