@@ -24,8 +24,6 @@ jedi==0.18.2
 jupyter_client==8.0.2
 jupyter_core==5.2.0
 kiwisolver==1.4.4
-manim==0.16.0.post0
-ManimPango==0.4.1
 mapbox-earcut==0.12.11
 matplotlib==3.6.1
 matplotlib-inline==0.1.6
@@ -45,7 +43,6 @@ prompt-toolkit==3.0.36
 psutil==5.9.4
 ptyprocess==0.7.0
 pure-eval==0.2.2
-pycairo==1.21.0
 pydub==0.25.1
 pyglet==2.0.0
 Pygments==2.13.0
