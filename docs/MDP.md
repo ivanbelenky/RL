@@ -89,7 +89,7 @@ $$
 As the title suggest, dynamic programming also encompasses methods to solve the optimal problem, that is the best policy there is given an MDP. In the same fashion we can define Optimality Equations for the value function. It can be easily proven by the absurd that the following is true for 
 
 $$\color{orange}
-v_{\*} = \max_{a \in A} q_{\pi_{\*}}(s,a) = \max_{a \in A} \sum_{s', r} p(s,r|s',a)[ r + \gamma v_{\*}(s')]
+v_{*} = \max_{a \in A} q_{\pi_{*}}(s,a) = \max_{a \in A} \sum_{s', r} p(s,r|s',a)[ r + \gamma v_{*}(s')]
 $$
 
 
@@ -97,7 +97,7 @@ Mouthful absurd. If the above is not true it is possible to:
 - define $\pi'(s)$ that modifies the policy for all states with the above rule 
 - new policy chooses the action that maximizes the state value function for every $s$. 
 - calculate the value function with this new policy  
-- when we encounter each state again the new policy is going to kick in. Since it always gives more reward, and since the value function is composed by discounted rewards, we now have a higher value function policy. Hence an absurd, since $v_{\*}$ was already the optimal. 
+- when we encounter each state again the new policy is going to kick in. Since it always gives more reward, and since the value function is composed by discounted rewards, we now have a higher value function policy. Hence an absurd, since $v_{*}$ was already the optimal. 
   
 If this is still not clear was a mouthful see that 
 
@@ -120,7 +120,7 @@ It is precisely the policy improvement theorem the one that guarantees  that the
 As Sutton, illustrates the Policy Iteration algorithm consists of the following 
 
 $$\color{orange}
-\pi_0 \overset{\mathbb{E}}{\longrightarrow} v_{\pi_0} \overset{\mathbb{I}}{\longrightarrow} \pi_1 \overset{\mathbb{E}}{\longrightarrow} \cdots \overset{\mathbb{I}}{\longrightarrow} \pi_{\*} \overset{\mathbb{E}}{\longrightarrow} v_{\pi_{\*}}
+\pi_0 \overset{\mathbb{E}}{\longrightarrow} v_{\pi_0} \overset{\mathbb{I}}{\longrightarrow} \pi_1 \overset{\mathbb{E}}{\longrightarrow} \cdots \overset{\mathbb{I}}{\longrightarrow} \pi_{*} \overset{\mathbb{E}}{\longrightarrow} v_{\pi_{*}}
 $$
 
 So this particular solution is quite costly since we have to perform an evaluation step every single time the policy changes, and this is costly, mostly in iterative settings. But there are good news, that is Value Iteration.
@@ -134,7 +134,7 @@ $$
  We define then the **Bellman Optimality Operator** as 
 
 $$\color{orange}
-\operatorname{B_{\*}}[v(s)] := \max_a[r(s,a) + \gamma v(s)]
+\operatorname{B_{*}}[v(s)] := \max_a[r(s,a) + \gamma v(s)]
 $$
 
 and we can show that it is a contraction mapping under the $L_\infty$ norm once again, with the help of the following property
@@ -147,7 +147,7 @@ then
 
 $$\color{orange}
 \begin{aligned}
-\left|\left|\operatorname{B_{\*}}[v] - \operatorname{B_{\*}}[u]\right|\right|_\infty  &= \\ \\
+\left|\left|\operatorname{B_{*}}[v] - \operatorname{B_{*}}[u]\right|\right|_\infty  &= \\ \\
 &= \gamma \|\| \max_a \sum_{s', r} p(s,r|s',a)[v(s') - u(s')]\|\|_\infty \\ \\
 &\leq \gamma ||v - u||_\infty
 \end{aligned}
@@ -156,13 +156,13 @@ $$
 once again the optimal value function is a fixed point of the Bellman Optimality Operator, i.e.
 
 $$\color{orange}
-v_{\*} = \operatorname{B_{\*}}[v_{\*}]
+v_{*} = \operatorname{B_{*}}[v_{*}]
 $$
 
 implying that an iterative approach can be built such that
 
 $$\color{orange}
-v_{k+1} = \operatorname{B_{\*}}[v_{k}]
+v_{k+1} = \operatorname{B_{*}}[v_{k}]
 $$
 
 Since we are guaranteed convergence, we can basically apply policy iteration but going for iterative policy evaluation just with one step.  
@@ -183,7 +183,6 @@ There is a nice inutition behind what is going on whenever we are performing any
 ![](/assets/images/2023-01-24-11-04-11.png)
 
 Each of the steps in GPI fights in opposite directions, the policy improvement is pushing the policy to the greedy optimal solution, and by doing so, making the current value function invalid in some sense. The value function just corrects this invalidity, and by doing so, lets everybody know that the current policy is not optimal. For the techniques shown, given that there is a contraction mapping, and guaranteed convergence to the unique optimal solution, it could be argued that the value function space is convex. 
-
 
 
 <br>

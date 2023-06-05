@@ -21,7 +21,7 @@ from rl.utils import (
     TransitionException,
     EpisodeStep,
     W_INIT, 
-    MAX_ITER, 
+    MAX_ITER,
     MAX_STEPS
 ) 
 
