@@ -143,6 +143,4 @@ tree.plot()
 
 While the code in this package provides a basic implementation of the algorithms from the book, it is not necessarily the most efficient or well-written. If you have suggestions for improving the code, please feel free to open an issue.
 
-In addition to the code, there are useful Jupyter notebooks [here](https://www.google.com) that provide examples of how to use the implemented algorithms and models. Notebooks are usually implementations of examples present on suttons book.
-
 Overall, this package provides a valuable resource for anyone interested in learning about reinforcement learning and implementing algorithms from scratch. By no means prod ready.
