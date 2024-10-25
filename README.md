@@ -10,13 +10,6 @@
 $ python setup.py install
 ```
 
-### pypi (incoming)
-
-```sh
-pip install mypyrl 
-```
-
-
 # Overview
 
 This repository contains code that implements algorithms and models from Sutton's book on reinforcement learning. The book, titled "Reinforcement Learning: An Introduction," is a classic text on the subject and provides a comprehensive introduction to the field.
