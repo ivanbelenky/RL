@@ -1,31 +1,20 @@
 import copy
-import time
 from time import perf_counter
 from abc import ABC, abstractmethod
-from typing import (
-    Optional, 
-    Callable, 
-    Tuple, 
-    Callable, 
-    Sequence,
-    Union,
-    List,
-    Any
-)
+from typing import Optional, Tuple, Callable, Sequence, Union, List, Any
 
 import numpy as np
 
 from rl.utils import (
-    Policy, 
+    Policy,
     Transition,
     TransitionException,
     EpisodeStep,
-    W_INIT, 
-    MAX_ITER,
-    MAX_STEPS
-) 
+    W_INIT,
+    MAX_STEPS,
+)
 
-'''
+"""
 All of this may change if the policy gradient methods are
 similar to this implementation.
 
@@ -47,27 +36,28 @@ Therefore we generate the most abstract SGD method. The two most
 important parts of this methods is the U approximation to the real
 value, and the value function approximator, this class should be
 differentiable, or hold a gradient method.
-'''
+"""
 
 
 class Approximator(ABC):
-    '''Approximator base class that implements caster methods
+    """Approximator base class that implements caster methods
     as well as defining the basic interface of any approximator.
     It has to be updateable and callable. Updatability implies
-    that it can change its inner attributes and hopefully learn. 
-    '''
+    that it can change its inner attributes and hopefully learn.
+    """
+
     @abstractmethod
     def __call__(self, s: Any, *args, **kwargs) -> float:
-        '''Return the value of the approximation'''
+        """Return the value of the approximation"""
         raise NotImplementedError
 
     @abstractmethod
     def update(self, *args, **kwargs) -> Union[None, np.ndarray]:
-        '''Update the approximator'''
+        """Update the approximator"""
         raise NotImplementedError
 
     def copy(self, *args, **kwargs) -> Any:
-        '''Return a copy of the approximator'''
+        """Return a copy of the approximator"""
         return copy.deepcopy(self)
 
     def is_differentiable(self):
@@ -76,31 +66,32 @@ class Approximator(ABC):
             return True
         return False
 
+
 class ModelFreeTLPolicy(Policy):
-    '''ModelFreeTLPolicy is for approximated methods what 
+    """ModelFreeTLPolicy is for approximated methods what
     ModelFreePolicy is for tabular methods.
 
     This policies are thought with tabular actions in mind, since
-    the problem of continuous action spaces are a topic of ongoing 
+    the problem of continuous action spaces are a topic of ongoing
     research and not yet standardized. For each a in the action-space A
     there will exist an approximator.
-    '''
+    """
+
     def __init__(self, actions: Sequence[Any], q_hat: Approximator):
         self.actions = actions
         self.A = len(actions)
         self.q_hat = q_hat
-    
+
     def update_policy(self, *args, **kwargs):
         self.q_hat.update(*args, **kwargs)
 
     def __call__(self, state: Any):
         action_idx = np.argmax([self.q_hat((state, a)) for a in self.actions])
         return self.actions[action_idx]
-        
+
 
 class EpsSoftSALPolicy(ModelFreeTLPolicy):
-    def __init__(self, actions: Sequence[Any], q_hat: Approximator,
-                 eps: float = 0.1):
+    def __init__(self, actions: Sequence[Any], q_hat: Approximator, eps: float = 0.1):
         super().__init__(actions, q_hat)
         self.eps = eps
 
@@ -108,11 +99,11 @@ class EpsSoftSALPolicy(ModelFreeTLPolicy):
         if np.random.rand() < self.eps:
             return np.random.choice(self.actions)
         return super().__call__(state)
-    
 
-class REINFORCEPolicy(ModelFreeTLPolicy):    
+
+class REINFORCEPolicy(ModelFreeTLPolicy):
     def __init__(self, actions: Sequence[Any], pi_hat: Approximator):
-        '''Must be a differential approximator'''
+        """Must be a differential approximator"""
         self.actions = actions
         self.pi_hat = pi_hat
         if not self.pi_hat.is_differentiable():
@@ -125,23 +116,23 @@ class REINFORCEPolicy(ModelFreeTLPolicy):
         return (grad_pi_sa - grads_pi_sa @ pi_sa).reshape(-1)
 
     def update_policy(self, c: float, s: Any, a: Any):
-        self.pi_hat.w += c*self.grad_lnpi(s, a)
+        self.pi_hat.w += c * self.grad_lnpi(s, a)
 
     def pi_sa(self, s: Any) -> np.ndarray:
         pi_hat_sa = [self.pi_hat((s, a)) for a in self.actions]
         max_sa = max(pi_hat_sa)
         e_hsa = [np.exp(pi_hat_sa[i] - max_sa) for i in range(len(self.actions))]
         denom = sum(e_hsa)
-        pi_sa = np.array([e_hsa[i]/denom for i in range(len(self.actions))])        
+        pi_sa = np.array([e_hsa[i] / denom for i in range(len(self.actions))])
         return pi_sa
 
     def __call__(self, s: Any) -> float:
-        '''default softmax implementation'''
+        """default softmax implementation"""
         return np.random.choice(self.actions, p=self.pi_sa(s))
 
 
 class ModelFreeTL:
-    '''
+    """
     ModelFreeTL stands for Model Free Tabular Less, even if we have state,
     to approximate methods what ModelFree is to tabular ones.
 
@@ -149,13 +140,18 @@ class ModelFreeTL:
     on solvers, but can be used standalone as well. The usual case
     for this is when you want to generate arbitrary episodes for a
     specific environment. This class will stand in between of the
-    user implemented transitions and the solvers. In difference with 
-    tabular ModelFree there is no room for validation previous to 
+    user implemented transitions and the solvers. In difference with
+    tabular ModelFree there is no room for validation previous to
     runtime executions.
-    '''
+    """
 
-    def __init__(self, transition: Transition, rand_state: Callable,
-                 policy: ModelFreeTLPolicy, gamma: float = 1): 
+    def __init__(
+        self,
+        transition: Transition,
+        rand_state: Callable,
+        policy: ModelFreeTLPolicy,
+        gamma: float = 1,
+    ):
         self.policy = policy
         self.rand_state = rand_state
         self.transition = transition
@@ -170,21 +166,22 @@ class ModelFreeTL:
             try:
                 self.transition(rand_s, rand_a)
             except Exception as e:
-                raise TransitionException(
-                    f'Transition function is not valid: {e}')
-        
+                raise TransitionException(f"Transition function is not valid: {e}")
+
     def random_sa(self):
         a = np.random.choice(self.policy.actions)
         s = self.rand_state()
         return s, a
 
-    def generate_episode(self, 
-                         s_0: Any, 
-                         a_0: Any, 
-                         policy: ModelFreeTLPolicy=None, 
-                         max_steps: int=MAX_STEPS) -> List[EpisodeStep]:
-        '''Generate an episode using given policy if any, otherwise
-        use the one defined as the attribute'''
+    def generate_episode(
+        self,
+        s_0: Any,
+        a_0: Any,
+        policy: ModelFreeTLPolicy = None,
+        max_steps: int = MAX_STEPS,
+    ) -> List[EpisodeStep]:
+        """Generate an episode using given policy if any, otherwise
+        use the one defined as the attribute"""
         policy = policy if policy else self.policy
         episode = []
         end = False
@@ -199,24 +196,26 @@ class ModelFreeTL:
 
         return episode
 
-    def step_transition(self, state: Any, action: Any
-    ) -> Tuple[Tuple[Any, float], bool]:    
+    def step_transition(
+        self, state: Any, action: Any
+    ) -> Tuple[Tuple[Any, float], bool]:
         return self.transition(state, action)
-    
+
 
 class SGDWA(Approximator):
-    '''Stochastic Gradient Descent Weight-Vector Approximator
+    """Stochastic Gradient Descent Weight-Vector Approximator
     for MSVE (mean square value error).
 
     Differentiable Value Function approximator dependent
     on a weight vector. Must define a gradient method. Thought
     to be less of a general case and more oriented toward the
     mean square value error VE, the prediction objective.
-    '''
-    def __init__(self, 
-                 fs:int=None,
-                 basis: Optional[Callable[[Any], np.ndarray]]=None):
-        '''
+    """
+
+    def __init__(
+        self, fs: int = None, basis: Optional[Callable[[Any], np.ndarray]] = None
+    ):
+        """
         Parameters
         ----------
         fs: int
@@ -224,29 +223,29 @@ class SGDWA(Approximator):
         basis: Callable[[Any], np.ndarray], optional
             function basis defaults to identity. If not specified the
             signature must be Callable[[np.ndarray], np.ndarray] otherwise
-            it will be probably fail miserably. 
-        '''  
+            it will be probably fail miserably.
+        """
         self.fs = fs
         self.basis_name = basis.__name__
         self.basis = basis if basis else lambda x: x
-        self.w = np.ones(self.fs)*W_INIT
+        self.w = np.ones(self.fs) * W_INIT
 
     def grad(self, x: Any) -> np.ndarray:
-        '''Return the gradient of the approximation'''
+        """Return the gradient of the approximation"""
         return self.basis(x)
 
     def delta_w(self, U: float, alpha: float, x: Any, g: np.ndarray) -> np.ndarray:
-        '''g: vector value, either gradient or elegibility trace'''
+        """g: vector value, either gradient or elegibility trace"""
         return alpha * (U - self(x)) * g
 
     def et_update(self, U: float, alpha: float, x: Any, z: np.ndarray) -> np.ndarray:
-        '''Updates inplace with elegibility traces the weight vector'''
+        """Updates inplace with elegibility traces the weight vector"""
         dw = self.delta_w(U, alpha, x, z)
         self.w = self.w + dw
         return dw
 
     def update(self, U: float, alpha: float, x: Any) -> np.ndarray:
-        '''Updates inplace the weight vector and returns update just in case'''
+        """Updates inplace the weight vector and returns update just in case"""
         dw = self.delta_w(U, alpha, x, self.grad(x))
         self.w = self.w + dw
         return dw
