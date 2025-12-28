@@ -1,12 +1,11 @@
 """RL Copyright © 2023 Iván Belenky"""
 
-from typing import Tuple
 from abc import ABC, abstractmethod
 
 import numpy as np
 
+from rl.solvers.model_based import policy_iteration, value_iteration, vq_pi_iter_naive
 from rl.utils import Policy, RewardGenerator
-from rl.solvers.model_based import vq_pi_iter_naive, policy_iteration, value_iteration
 
 PROB_TOL = 1e-3
 ESTIMATE_ITERS = int(1e3)
@@ -73,7 +72,12 @@ class MarkovPolicy(Policy):
     each row must sum to 1 within the specified tolerance 1E-3.
     """
 
-    def __init__(self, pi_sa: np.ndarray = None, s: int = None, a: int = None):
+    def __init__(
+        self,
+        pi_sa: np.ndarray | None = None,
+        s: int | None = None,
+        a: int | None = None,
+    ):
         """
         pi_sa: policy matrix
         s: number of states
@@ -88,7 +92,8 @@ class MarkovPolicy(Policy):
 
         if pi_sa:
             self.pi_sa = pi_sa
-            self.s, self.a = self.pi_sa.shape
+            sa: tuple[int, int] = self.pi_sa.shape
+            self.s, self.a = sa
             self._validate_attr()
         else:
             self.s = s
@@ -143,8 +148,8 @@ class MDP:
         states: np.ndarray,
         actions: np.ndarray,
         gamma: float = 0.9,
-        policy: Policy = None,
-        reward_gen: RewardGenerator = None,
+        policy: Policy | None = None,
+        reward_gen: RewardGenerator | None = None,
     ):
         self.p_s = p_s
         self.states = states
@@ -191,7 +196,9 @@ class MDP:
     def pi_sa(self, state: int) -> np.ndarray:
         return self.policy.pi_sa(state)
 
-    def vq_pi(self, policy: MarkovPolicy = None, method: str = "iter_n") -> np.ndarray:
+    def vq_pi(
+        self, policy: MarkovPolicy | None = None, method: str = "iter_n"
+    ) -> np.ndarray:
         """
         Individual state value functions and action-value functions
         vpi and qpi cannot be calculated for bigger problems. That
@@ -205,7 +212,9 @@ class MDP:
         return solver(self, policy)
 
     def optimize_policy(
-        self, method: str = "policy_iteration", policy: MarkovPolicy = None
+        self,
+        method: str = "policy_iteration",
+        policy: MarkovPolicy | None = None,
     ) -> MarkovPolicy:
         """
         Optimal policy is the policy that maximizes the expected
@@ -217,9 +226,9 @@ class MDP:
         if not solver:
             raise ValueError(f"Method {method} does not exist")
 
-        solver(self, policy)
+        return solver(self, policy)
 
-    def __call__(self, state: int = 0) -> Tuple[int, float]:
+    def __call__(self, state: int = 0) -> tuple[int, float]:
         p = self.p_s[state][self.policy(state)]
         next_state = np.random.choice(self.states, p=p)
         self.curr_state = next_state

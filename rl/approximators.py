@@ -1,17 +1,17 @@
 import copy
-from time import perf_counter
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple, Callable, Sequence, Union, List, Any
+from time import perf_counter
+from typing import Any, Callable, List, Optional, Sequence, Union
 
 import numpy as np
 
 from rl.utils import (
+    MAX_STEPS,
+    W_INIT,
+    EpisodeStep,
     Policy,
     Transition,
     TransitionException,
-    EpisodeStep,
-    W_INIT,
-    MAX_STEPS,
 )
 
 """
@@ -198,7 +198,7 @@ class ModelFreeTL:
 
     def step_transition(
         self, state: Any, action: Any
-    ) -> Tuple[Tuple[Any, float], bool]:
+    ) -> tuple[tuple[Any, float], bool]:
         return self.transition(state, action)
 
 

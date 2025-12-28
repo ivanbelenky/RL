@@ -1,25 +1,25 @@
-from typing import Tuple, Sequence, Any
+from typing import Any, Sequence
 
-from tqdm import tqdm
 import numpy as np
+from tqdm import tqdm
 
-from rl.solvers.model_free import (
-    get_sample,
-    _set_s0_a0,
-    _set_policy,
-)
 from rl.model_free import ModelFree, ModelFreePolicy
+from rl.solvers.model_free import (
+    _set_policy,
+    _set_s0_a0,
+    get_sample,
+)
 from rl.utils import (
-    UCTree,
-    UCTNode,
-    _typecheck_all,
-    _get_sample_step,
-    VQPi,
-    Samples,
-    Transition,
-    PQueue,
     MAX_ITER,
     MAX_STEPS,
+    PQueue,
+    Samples,
+    Transition,
+    UCTNode,
+    UCTree,
+    VQPi,
+    _get_sample_step,
+    _typecheck_all,
 )
 
 
@@ -35,11 +35,11 @@ def dynaq(
     plus: bool = False,
     alpha: float = 0.05,
     n_episodes: int = MAX_ITER,
-    policy: ModelFreePolicy = None,
-    eps: float = None,
+    policy: ModelFreePolicy | None = None,
+    eps: float | None = None,
     samples: int = 1000,
     max_steps: int = MAX_STEPS,
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     """
     TODO: docs
     """
@@ -138,11 +138,11 @@ def priosweep(
     plus: bool = False,
     alpha: float = 0.05,
     n_episodes: int = MAX_ITER,
-    policy: ModelFreePolicy = None,
-    eps: float = None,
+    policy: ModelFreePolicy | None = None,
+    eps: float | None = None,
     samples: int = 1000,
     max_steps: int = MAX_STEPS,
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     """
     TODO: docs
     """
@@ -250,7 +250,7 @@ def t_sampling(
     samples: int = 1000,
     optimize: bool = False,
     max_steps: int = MAX_STEPS,
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     """
     TODO: docs
     """

@@ -1,13 +1,12 @@
-from abc import ABC, abstractmethod
 import warnings
-from typing import Any, Sequence, List, Tuple, Callable, NewType
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Literal, NewType, Sequence, cast
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.axes import Axes
 
-plt.style.use("dark_background")
-
-MAX_STEPS = 1e3
+MAX_STEPS = int(1e3)
 MAX_ITER = int(1e4)
 TOL = 5e-8
 MEAN_ITERS = int(1e4)
@@ -19,7 +18,7 @@ class Policy(ABC):
         pass
 
     @abstractmethod
-    def __call__(self, state: int = None) -> int:
+    def __call__(self, state: int | None) -> int:
         raise NotImplementedError
 
     @abstractmethod
@@ -81,10 +80,10 @@ class Qpi(_TabularValues):
         return f"Vpi({self.v[:5]}...)"
 
 
-VQPi = NewType("VQPi", Tuple[Vpi, Qpi, Policy])
-Samples = NewType("Samples", Tuple[int, List[Vpi], List[Qpi], List[Policy]])
-Transition = Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
-EpisodeStep = NewType("EpisodeStep", Tuple[int, int, float])
+VQPi = NewType("VQPi", tuple[Vpi, Qpi, Policy])
+Samples = NewType("Samples", tuple[int, list[Vpi], list[Qpi], list[Policy]])
+Transition = Callable[[Any, Any], tuple[tuple[Any, float], bool]]
+EpisodeStep = NewType("EpisodeStep", tuple[int, int, float])
 
 
 class TransitionException(Exception):
@@ -94,7 +93,7 @@ class TransitionException(Exception):
 class PQueue:
     """Priority Queue"""
 
-    def __init__(self, items: List[Tuple[float, Any]]):
+    def __init__(self, items: list[tuple[float, Any]]):
         self.items = items
         self._sort()
 
@@ -124,8 +123,8 @@ class RewardGenerator:
     }
 
     @classmethod
-    def generate(self, distribution="normal", *args, **kwargs) -> float:
-        generator = self.DISTRIBUTION.get(distribution)
+    def generate(cls, distribution="normal", *args, **kwargs) -> float:
+        generator = cls.DISTRIBUTION.get(distribution)
         if not generator:
             raise ValueError(f"Invalid distribution: {distribution}")
         return generator(*args, **kwargs)
@@ -138,7 +137,7 @@ class UCTNode:
         self.q = q
         self.n = n
         self.parent = parent
-        self.children = {}
+        self.children: dict[Action, UCTNode] = {}
         self.is_terminal = False
 
     def add_child(self, child):
@@ -170,7 +169,7 @@ class UCTree:
         max_depth = self.max_depth()
         width = 4 * max_depth
         height = max_depth
-        stack = [(self.root, 0, 0, width)]
+        stack: list[tuple[UCTNode, int, float, float]] = [(self.root, 0, 0, width)]
         treenodes = []
         lines = []
         while stack:
@@ -187,9 +186,9 @@ class UCTree:
                     )
 
         fig = plt.figure(figsize=(10, 10))
-        ax = fig.add_subplot(111)
-        ax.set_xticks([])
-        ax.set_yticks([])
+        ax = cast(Axes, fig.add_subplot(111))
+        ax.set_xticks([])  # type: ignore
+        ax.set_yticks([])  # type: ignore
         for node in treenodes:
             ax.scatter(node[0], node[1], color="white", s=1)
         for line in lines:
@@ -219,13 +218,13 @@ def _typecheck_transition(transition):
         )
 
 
-def _typecheck_constants(*args):
+def _typecheck_constants(*args: int | float):
     for arg in args:
         if not isinstance(arg, (float, int)):
             raise TypeError(f"Constants must be float or int, not {type(arg)}")
 
 
-def _typecheck_booleans(*args):
+def _typecheck_booleans(*args: bool):
     for arg in args:
         if not isinstance(arg, bool):
             raise TypeError(f"Booleans must be bool, not {type(arg)}")
@@ -238,7 +237,11 @@ def _typecheck_policies(*args):
 
 
 def _typecheck_all(
-    tabular_idxs=None, transition=None, constants=None, booleans=None, policies=None
+    tabular_idxs=None,
+    transition=None,
+    constants=None,
+    booleans=None,
+    policies=None,
 ):
     if tabular_idxs:
         _typecheck_tabular_idxs(*tabular_idxs)
@@ -284,7 +287,10 @@ class BasisException(Exception):
     pass
 
 
-def get_basis(self, basis, cij) -> Callable[[np.ndarray], np.ndarray]:
+def get_basis(
+    basis: Literal["poly", "fourier"],
+    cij,
+) -> Callable[[np.ndarray], np.ndarray]:
     """get basis function for linear approximator using polynomial or
     fourier base
 
@@ -302,21 +308,27 @@ def get_basis(self, basis, cij) -> Callable[[np.ndarray], np.ndarray]:
         ones defined as sequences or numpy arrays. Any other type will
         raise an error.
     """
-    if basis == "poly":
+    _basis_function = None
+    match basis:
+        case "poly":
 
-        def _basis(s):
-            xs = [np.prod(s**cj) for cj in cij]
-            return np.array(xs)
+            def _basis_poly(s):
+                xs = [np.prod(s**cj) for cj in cij]
+                return np.array(xs)
 
-    if basis == "fourier":
+            _basis_function = _basis_poly
 
-        def _basis(s):
-            xs = [np.cos(np.pi * np.dot(s, cj)) for cj in cij]
-            return np.array(xs)
+        case "fourier":
+
+            def _basis_fourier(s):
+                xs = [np.cos(np.pi * np.dot(s, cj)) for cj in cij]
+                return np.array(xs)
+
+            _basis_function = _basis_fourier
 
     def basis_f(s):
         try:
-            return _basis(s)
+            return _basis_function(s)
         except Exception:
             raise BasisException("State must be a sequence or numpy array")
 

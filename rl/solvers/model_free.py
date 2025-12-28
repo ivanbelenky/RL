@@ -2,23 +2,23 @@
 RL - Copyright © 2023 Iván Belenky @Leculette
 """
 
-from typing import Tuple, Sequence, Any
+from typing import Any, Sequence
 
-from tqdm import tqdm
 import numpy as np
+from tqdm import tqdm
 
-from rl.model_free import ModelFree, ModelFreePolicy, EpsilonSoftPolicy
+from rl.model_free import EpsilonSoftPolicy, ModelFree, ModelFreePolicy
 from rl.utils import (
-    _typecheck_all,
-    _get_sample_step,
-    _check_ranges,
-    VQPi,
+    MAX_ITER,
+    MAX_STEPS,
+    Qpi,
     Samples,
     Transition,
     Vpi,
-    Qpi,
-    MAX_ITER,
-    MAX_STEPS,
+    VQPi,
+    _check_ranges,
+    _get_sample_step,
+    _typecheck_all,
 )
 
 
@@ -65,7 +65,7 @@ def alpha_mc(
     optimize: bool = False,
     policy: ModelFreePolicy = None,
     eps: float = None,
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     """α-MC state and action-value function estimation, policy optimization
 
     Alpha weighted Monte Carlo state and action-value function estimation, policy
@@ -104,9 +104,9 @@ def alpha_mc(
 
     Returns
     -------
-    vqpi : Tuple[VPi, QPi, Policy]
+    vqpi : tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, Vpi, Qpi, Policy]
+    samples : tuple[int, Vpi, Qpi, Policy]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the policy until
@@ -237,7 +237,7 @@ def off_policy_mc(
     policy: ModelFreePolicy = None,
     eps: float = None,
     b: ModelFreePolicy = None,
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     """Off-policy Monte Carlo state and action value function estimation, policy
 
     Off policy Monte Carlo method for estimating state and action-value functtions
@@ -275,9 +275,9 @@ def off_policy_mc(
 
     Returns
     -------
-    vqpi : Tuple[VPi, QPi, Policy]
+    vqpi : tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
+    samples : tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the TODO:.
@@ -406,7 +406,7 @@ def tdn(
     method: str = "sarsa",
     samples: int = 1000,
     max_steps: int = MAX_STEPS,
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     """N-temporal differences algorithm.
 
     Temporal differences algorithm for estimating the value function of a
@@ -444,9 +444,9 @@ def tdn(
 
     Returns
     -------
-    vqpi : Tuple[VPi, QPi, Policy]
+    vqpi : tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
+    samples : tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the TODO:.
@@ -750,7 +750,7 @@ def n_tree_backup(
     optimize: bool = False,
     samples: int = 1000,
     max_steps: int = MAX_STEPS,
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     """N-temporal differences algorithm.
 
     Temporal differences algorithm for estimating the value function of a
@@ -788,9 +788,9 @@ def n_tree_backup(
 
     Returns
     -------
-    vqpi : Tuple[VPi, QPi, Policy]
+    vqpi : tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[ModelFreePolicy]]
+    samples : tuple[int, List[Vpi], List[Qpi], List[ModelFreePolicy]]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the TODO:.

@@ -1,18 +1,18 @@
-from typing import Tuple
+from typing import tuple
 
 import numpy as np
 from numpy.linalg import norm as lnorm
 
 from rl.utils import (
-    Policy,
-    _get_sample_step,
-    VQPi,
-    Samples,
-    Vpi,
-    Qpi,
     MAX_ITER,
     MAX_STEPS,
     TOL,
+    Policy,
+    Qpi,
+    Samples,
+    Vpi,
+    VQPi,
+    _get_sample_step,
 )
 
 # TODO: refactor, docs
@@ -35,7 +35,7 @@ def get_sample(MDP, v, q, π, n_iter):
 
 def vq_pi_iter_naive(
     MDP, policy: Policy, tol: float = TOL, inplace=False, max_iters: int = MAX_STEPS
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     sample_step = _get_sample_step(samples, max_iters // 10)  # RULE OF THUMB
 
     v, q, samples = _vq_pi_iter_naive(MDP, policy, tol, max_iters, inplace, sample_step)
@@ -98,7 +98,7 @@ def policy_iteration(
     tol_opt: float = TOL,
     max_iters_opt: int = MAX_ITER,
     samples: int = 1000,
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     vᵢ_1, q_i_1 = vq_pi_iter_naive(MDP, policy, tol_eval, max_iters_eval)
     vᵢ, q_i = vᵢ_1.copy(), q_i_1.copy()
 
@@ -140,7 +140,7 @@ def value_iteration(
     inplace: bool = False,
     tol: float = TOL,
     max_iters: int = MAX_ITER,
-) -> Tuple[VQPi, Samples]:
+) -> tuple[VQPi, Samples]:
     sample_step = _get_sample_step(samples, max_iters // 10)  # RULE OF THUMB
 
     v, q, samples = _value_iteration(MDP, policy, tol, max_iters, inplace, sample_step)

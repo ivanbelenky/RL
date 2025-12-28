@@ -71,7 +71,7 @@ All model free solvers will work just by defining `states` `actions` and a `tras
 ```python
 states: Sequence[Any]
 actions: Sequence[Any]
-transtion: Callable[[Any, Any], Tuple[Tuple[Any, float], bool]]
+transtion: Callable[[Any, Any], tuple[tuple[Any, float], bool]]
 ```
 
 # Examples 
