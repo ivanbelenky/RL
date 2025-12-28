@@ -12,6 +12,12 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "basedpyright>=1.36.2",
     "ipykernel>=7.1.0",
     "ipython>=9.8.0",
 ]
+
+[tool.basedpyright]
+include = ["src"]
+extraPaths = ["../agate_utils/src"]
+typeCheckingMode = "strict"
