@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import warnings
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Literal, NewType, Sequence, cast
+from copy import deepcopy
+from functools import partial
+from typing import Any, Callable, Literal, NewType, Self, Sequence, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,7 +22,7 @@ class Policy(ABC):
         pass
 
     @abstractmethod
-    def __call__(self, state: int | None) -> int:
+    def __call__(self, *args, **kwargs) -> int:
         raise NotImplementedError
 
     @abstractmethod
@@ -47,6 +51,16 @@ class _TabularIndexer:
             return self.seq[rnd_idx]
         return rnd_idx
 
+    @classmethod
+    def from_indexable(cls, indexable: _TabularIndexable):
+        match indexable:
+            case np.ndarray():
+                return cls(indexable)
+            case int():
+                return cls([i for i in range(indexable)])
+            case _:
+                raise ValueError(f"Cannot index this type: {type(indexable)}")
+
 
 class State(_TabularIndexer):
     pass
@@ -60,14 +74,23 @@ class StateAction(_TabularIndexer):
     pass
 
 
+_TabularIndexable = np.ndarray | int
+
+
 class _TabularValues:
-    def __init__(self, values: np.ndarray, idx: _TabularIndexer):
+    def __init__(self, values: np.ndarray, idx: _TabularIndexer | _TabularIndexable):
         self.v = values
+        if not isinstance(idx, _TabularIndexer):
+            self.idx = _TabularIndexer.from_indexable(idx)
+
         self.idx = idx
         self.idx_val = {k: v for k, v in zip(idx.index.keys(), values)}
 
     def values(self):
         return self.v
+
+    def copy(self) -> Self:
+        return deepcopy(self)
 
 
 class Vpi(_TabularValues):
@@ -111,7 +134,25 @@ class PQueue:
         return len(self.items) == 0
 
 
-class RewardGenerator:
+class RewardGeneartor(ABC):
+    @classmethod
+    @abstractmethod
+    def generate(cls, *args, **kwargs):
+        raise NotImplementedError
+
+
+RandomDistributionT = Literal[
+    "bernoulli",
+    "gaussian",
+    "uniform",
+    "exponential",
+    "poisson",
+    "pareto",
+    "triangular",
+]
+
+
+class RandomRewardGenerator:
     DISTRIBUTION = {
         "bernoulli": np.random.binomial,
         "gaussian": np.random.normal,
@@ -121,6 +162,16 @@ class RewardGenerator:
         "pareto": np.random.pareto,
         "triangular": np.random.triangular,
     }
+
+    def __init__(self, distribution: RandomDistributionT, *d_args, **d_kwargs):
+        self.gen_reward = partial(
+            self.DISTRIBUTION.get(distribution),
+            *d_args,
+            **d_kwargs,
+        )
+
+    def __call__(self):
+        return self.gen_reward()
 
     @classmethod
     def generate(cls, distribution="normal", *args, **kwargs) -> float:
