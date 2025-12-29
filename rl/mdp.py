@@ -6,7 +6,14 @@ from typing import Literal
 import numpy as np
 
 from rl.solvers.model_based import policy_iteration, value_iteration, vq_pi_iter_naive
-from rl.utils import Policy, RandomRewardGenerator, _TabularValues
+from rl.utils import (
+    Action,
+    Policy,
+    RandomRewardGenerator,
+    State,
+    StateAction,
+    _TabularValues,
+)
 
 PROB_TOL = 1e-3
 ESTIMATE_ITERS = int(1e3)
@@ -177,6 +184,7 @@ class MDP:
         self.p_s = p_s
         self.states = states
         self.actions = actions
+        self.stateaction = StateAction([(s, a) for s, a in zip(states, actions)])
         self.gamma: int | float = gamma
         self.reward_gen: MarkovReward = reward_gen
         self.history = []
@@ -185,6 +193,10 @@ class MDP:
         self.S = self.states.shape[0]
         self.A = self.actions.shape[0]
         self.policy = policy or MarkovPolicy(s=self.S, a=self.A)
+
+        # TODO: this two bad boys need to be the actual thing
+        self._states = State(states)  # type: ignore
+        self._actions = Action(actions)  # type: ignore
 
     @property
     def cumuluative_return(self) -> float:

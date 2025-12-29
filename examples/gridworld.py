@@ -88,7 +88,9 @@ def main():
     mdp = MDP(p_s, states, actions, gamma=0.9, reward_gen=TabularReward(r_sa))
 
     # calculate beforehand
-    v, q = mdp.vq_pi()
+    vq_pi = mdp.vq_pi()
+    v, q, _ = vq_pi
+
     print("Value Function before optimizing")
     print(v.reshape(GRID_SIZE, GRID_SIZE))
     print("-" * 50)
@@ -97,7 +99,8 @@ def main():
     print("\n")
 
     mdp.optimize_policy(method=optimization_method)
-    v, q = mdp.vq_pi()
+    vq_pi = mdp.vq_pi()
+    v, q, _ = vq_pi
     print("Value Function after optimizing")
     print(v.reshape(GRID_SIZE, GRID_SIZE))
     print("-" * 50)
