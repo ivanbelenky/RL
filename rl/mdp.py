@@ -4,14 +4,17 @@ from abc import ABC, abstractmethod
 from typing import Literal
 
 import numpy as np
+from numpy.typing import NDArray
 
 from rl.solvers.model_based import policy_iteration, value_iteration, vq_pi_iter_naive
+from rl.types import SizedIterable
 from rl.utils import (
     Action,
     Policy,
     RandomRewardGenerator,
     State,
     StateAction,
+    VQPi,
     _TabularValues,
 )
 
@@ -19,7 +22,7 @@ PROB_TOL = 1e-3
 ESTIMATE_ITERS = int(1e3)
 
 
-class MarkovReward(ABC):
+class MarkovReward[S: int, A: int](ABC):
     @property
     @abstractmethod
     def states(self) -> int:
@@ -36,7 +39,7 @@ class MarkovReward(ABC):
         """
         raise NotImplementedError
 
-    def r_sa(self, p_s: np.ndarray, state: int, action: int) -> float:
+    def r_sa(self, p_s: NDArray, state: int, action: int) -> float:
         """
         r(s,a) = E[Rt|St-1 = s, At-1 = a]
         """
@@ -164,7 +167,7 @@ class MarkovPolicy(Policy):
         return np.random.choice(self.pi_sa[state], p=self.pi_sa[state])
 
 
-class MDP:
+class MDP[S: int, A: int]:
     VQ_PI_SOLVERS = {"iter_n": vq_pi_iter_naive}
 
     OPTIMAL_POLICY_SOLVERS = {
@@ -172,43 +175,36 @@ class MDP:
         "value_iteration": value_iteration,
     }
 
+    SAS = tuple[S, A, S]
+
     def __init__(
         self,
-        p_s: np.ndarray,
-        states: np.ndarray,
-        actions: np.ndarray,
+        p_s: np.ndarray[SAS],
+        states: SizedIterable[S],
+        actions: SizedIterable[A],
         reward_gen: MarkovReward,
         gamma: float = 0.9,
         policy: MarkovPolicy | None = None,
     ):
-        self.p_s = p_s
-        self.states = states
-        self.actions = actions
-        self.stateaction = StateAction([(s, a) for s, a in zip(states, actions)])
+        self.p_s: np.ndarray[self.SAS] = p_s  # transition function
+
         self.gamma: int | float = gamma
         self.reward_gen: MarkovReward = reward_gen
-        self.history = []
+
+        self.states = State(states)
+        self.actions = Action(actions)
+        self.stateaction = StateAction([(s, a) for s in states for a in actions])
+
+        self.policy: MarkovPolicy = policy or MarkovPolicy(
+            s=self.states.N,
+            a=self.actions.N,
+        )
+
         self._validate_attr()
 
-        self.S = self.states.shape[0]
-        self.A = self.actions.shape[0]
-        self.policy = policy or MarkovPolicy(s=self.S, a=self.A)
-
-        # TODO: this two bad boys need to be the actual thing
-        self._states = State(states)  # type: ignore
-        self._actions = Action(actions)  # type: ignore
-
-    @property
-    def cumuluative_return(self) -> float:
-        return np.sum([r for _, r in self.history])
-
-    @property
-    def discounted_return(self) -> float:
-        return np.sum([r * (self.gamma**i) for i, (_, r) in enumerate(self.history)])
-
     def _validate_attr(self):
-        S = self.states.shape[0]
-        A = self.actions.shape[0]
+        S = self.states.N
+        A = self.actions.N
         if self.p_s.shape != (S, A, S):
             raise ValueError(
                 "p_s must be of shape "
@@ -233,34 +229,31 @@ class MDP:
 
     def vq_pi(
         self,
-        policy: MarkovPolicy | None = None,
         method: Literal["iter_n"] = "iter_n",
-    ) -> np.ndarray:
+    ) -> VQPi:
         """
         Individual state value functions and action-value functions
         vpi and qpi cannot be calculated for bigger problems. That
         constraint will give rise to parametrizations via DL.
         """
-        policy_to_optimize = policy or self.policy
         solver = self.VQ_PI_SOLVERS.get(method)
         if not solver:
             raise ValueError(f"Method {method} does not exist")
 
-        return solver(self, policy_to_optimize)
+        return solver(self, self.policy)
 
     def optimize_policy(
         self,
-        method: str = "policy_iteration",
-        policy: MarkovPolicy | None = None,
+        method: Literal["policy_iteration", "value_iteration"] = "policy_iteration",
     ) -> MarkovPolicy:
         """
         Optimal policy is the policy that maximizes the expected
         discounted return. It is the policy that maximizes the
         value function for each possible state.
         """
-        policy_to_optimize = policy or self.policy
         solver = self.OPTIMAL_POLICY_SOLVERS.get(method)
+
         if not solver:
             raise ValueError(f"Method {method} does not exist")
 
-        return solver(self, policy_to_optimize)
+        return solver(self, self.policy)

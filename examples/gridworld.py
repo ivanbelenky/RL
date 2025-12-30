@@ -85,27 +85,27 @@ def main():
     print(r_sa[:, 3].reshape(GRID_SIZE, GRID_SIZE))
 
     # Define the Markov Decision Process
-    mdp = MDP(p_s, states, actions, gamma=0.9, reward_gen=TabularReward(r_sa))
+    mdp = MDP(p_s, states, actions, gamma=0.9, reward_gen=TabularReward(r_sa))  # type: ignore
 
     # calculate beforehand
     vq_pi = mdp.vq_pi()
     v, q, _ = vq_pi
 
     print("Value Function before optimizing")
-    print(v.reshape(GRID_SIZE, GRID_SIZE))
+    print(v.v.reshape(GRID_SIZE, GRID_SIZE))
     print("-" * 50)
     print("Q Function before optimizing")
-    print(q.reshape(GRID_SIZE, GRID_SIZE, 4))
+    print(q.v.reshape(GRID_SIZE, GRID_SIZE, 4))
     print("\n")
 
-    mdp.optimize_policy(method=optimization_method)
+    mdp.optimize_policy(method=optimization_method)  # type: ignore
     vq_pi = mdp.vq_pi()
     v, q, _ = vq_pi
     print("Value Function after optimizing")
-    print(v.reshape(GRID_SIZE, GRID_SIZE))
+    print(v.v.reshape(GRID_SIZE, GRID_SIZE))
     print("-" * 50)
     print("Q Function after optimizing")
-    print(q.reshape(GRID_SIZE, GRID_SIZE, 4))
+    print(q.v.reshape(GRID_SIZE, GRID_SIZE, 4))
     print("\n")
 
     print("Optimal policy up action")

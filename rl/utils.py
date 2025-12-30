@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.axes import Axes
 
+from rl.types import SizedIterable
+
 MAX_STEPS = int(1e3)
 MAX_ITER = int(1e4)
 TOL = 5e-8
@@ -33,7 +35,7 @@ class Policy(ABC):
 class _TabularIndexer:
     """Simple proxy for tabular state & actions."""
 
-    def __init__(self, seq: Sequence[Any]):
+    def __init__(self, seq: SizedIterable[Any] | Sequence[Any]):
         self.seq = seq
         self.N = len(seq)
         self.index = {v: i for i, v in enumerate(seq)}

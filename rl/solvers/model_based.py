@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from __future__ import annotations
 
 import numpy as np
 from numpy.linalg import norm as lnorm
@@ -7,17 +7,11 @@ from rl.utils import (
     MAX_ITER,
     MAX_STEPS,
     TOL,
-    Policy,
     Qpi,
     Vpi,
     VQPi,
     _get_sample_step,
 )
-
-if TYPE_CHECKING:
-    pass
-
-# TODO: refactor, docs
 
 
 def get_sample(mdp, v, q, π, n_iter):
@@ -29,15 +23,15 @@ def get_sample(mdp, v, q, π, n_iter):
     return (_idx, _v, _q, _pi)
 
 
-# There are in-place methods optional. That is, there is actually an
+# NOTE: There are in-place methods optional. That is, there is actually an
 # inplace sweep of all states instantaneously, through the vectorization
 # of the update equations for DP methods. Should be Faster to execute and
 # slower to converge. But tests must be carried out to verify this claim.
 
 
 def vq_pi_iter_naive(
-    mdp,
-    policy: Policy,
+    mdp: MDP,
+    policy: MarkovPolicy,
     tol: float = TOL,
     inplace=False,
     max_iters: int = MAX_STEPS,
@@ -50,8 +44,8 @@ def vq_pi_iter_naive(
     return VQPi((v, q, policy))
 
 
-def _inplace_step_pe(mdp, v_i, _, π_sa, r_sa, p_s, γ):
-    for s in range(mdp.S):
+def _inplace_step_pe(mdp: MDP, v_i, _, π_sa, r_sa, p_s, γ):
+    for s in range(mdp.states.N):
         v_i[s] = np.dot(π_sa[s], r_sa[:, s])
         v_i[s] += γ * np.dot(p_s[s] @ v_i, π_sa[s])
     return v_i
@@ -67,18 +61,25 @@ def _naive_step_pe(_, v_i, v_i_1, π_sa, r_sa, p_s, γ):
 ITER_NAIVE_STEP_MAP = {"inplace": _inplace_step_pe, "naive": _naive_step_pe}
 
 
-def _vq_pi_iter_naive(mdp, policy, tol, max_iters, inplace, sample_step):
+def _vq_pi_iter_naive[S: int, A: int](
+    mdp: MDP[S, A],
+    policy: MarkovPolicy,
+    tol: float,
+    max_iters: int,
+    inplace: bool,
+    sample_step: int,
+) -> tuple[Vpi, Qpi]:
     γ = mdp.gamma
     p_s = mdp.p_s
 
-    v_i = np.ones(mdp.S)
+    v_i = np.ones(mdp.states.N)
     diff_norm = TOL * 2
 
     update_step = ITER_NAIVE_STEP_MAP["inplace" if inplace else "naive"]
 
-    π_sa = np.array([policy.π(s) for s in range(mdp.S)])  # SxA
+    π_sa = np.array([policy.π(s) for s in range(mdp.states.N)])  # SxA
     r_sa = np.array(
-        [[mdp.r_sa(s, a) for s in range(mdp.S)] for a in range(mdp.A)]
+        [[mdp.r_sa(s, a) for s in range(mdp.states.N)] for a in range(mdp.actions.N)]
     )  # AxS
 
     n_iter, samples = 0, []
@@ -99,8 +100,8 @@ def _vq_pi_iter_naive(mdp, policy, tol, max_iters, inplace, sample_step):
 
 
 def policy_iteration(
-    mdp,
-    policy: Policy,
+    mdp: MDP,
+    policy: MarkovPolicy,
     tol_eval: float = TOL,
     max_iters_eval: int = MAX_ITER,
     tol_opt: float = TOL,
@@ -128,7 +129,6 @@ def policy_iteration(
         vq_i = vq_pi_iter_naive(mdp, policy, tol_eval, max_iters_eval)
 
         n_iter += 1
-        print(n_iter)
         diff_norm = lnorm(v_i - v_i_1)
 
     return vq_i
@@ -150,8 +150,8 @@ VALUE_ITERATION_STEP_MAP = {"inplace": _inplace_step_vi, "naive": _naive_step_vi
 
 
 def value_iteration(
-    mdp,
-    policy: Policy | None = None,
+    mdp: MDP,
+    policy: MarkovPolicy,
     inplace: bool = False,
     tol: float = TOL,
     max_iters: int = MAX_ITER,
@@ -161,22 +161,29 @@ def value_iteration(
 
     v, q = _value_iteration(mdp, policy, tol, max_iters, inplace, sample_step)
 
-    return VQPi(v, q, policy)
+    return VQPi((v, q, policy))
 
 
-def _value_iteration(mdp, policy, tol, max_iters, inplace, sample_step):
+def _value_iteration(
+    mdp: MDP,
+    policy: MarkovPolicy,
+    tol: float,
+    max_iters: int,
+    inplace: bool,
+    sample_step: int,
+) -> tuple[Vpi, Qpi]:
     policy = policy if policy else mdp.policy
 
     γ = mdp.gamma
     p_s = mdp.p_s
 
-    v_i = np.ones(mdp.S)
+    v_i = np.ones(mdp.states.N)
     diff_norm = TOL * 2
 
     update_step = VALUE_ITERATION_STEP_MAP["inplace" if inplace else "naive"]
 
     r_sa = np.array(
-        [[mdp.r_sa(s, a) for s in range(mdp.S)] for a in range(mdp.A)]
+        [[mdp.r_sa(s, a) for s in range(mdp.states.N)] for a in range(mdp.actions.N)]
     )  # AxS
 
     n_iter, samples = 0, []
@@ -191,3 +198,6 @@ def _value_iteration(mdp, policy, tol, max_iters, inplace, sample_step):
 
     policy.update_policy(q_i)
     return Vpi(v_i, mdp.states), Qpi(q_i, mdp.stateaction)
+
+
+from rl.mdp import MDP, MarkovPolicy  # noqa
