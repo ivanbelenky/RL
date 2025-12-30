@@ -3,24 +3,23 @@ RL - Copyright © 2023 Iván Belenky @Leculette
 """
 
 from typing import (
-    Tuple,
-    Union,
-    Sequence,
+    Any,
     Callable,
     List,
-    Any,
+    Sequence,
+    Union,
 )
 
 import numpy as np
 
 from rl.utils import (
+    MAX_STEPS,
+    Action,
+    EpisodeStep,
     Policy,
     State,
-    Action,
     StateAction,
     TransitionException,
-    EpisodeStep,
-    MAX_STEPS,
 )
 
 
@@ -80,7 +79,7 @@ class ModelFree:
         actions: Sequence[Any],
         transition: Callable,
         gamma: float = 1,
-        policy: ModelFreePolicy = None,
+        policy: ModelFreePolicy | None = None,
     ):
         self.policy = policy
         self.states = State(states)
@@ -133,7 +132,7 @@ class ModelFree:
         self,
         state: Any,
         action: Any,
-    ) -> Tuple[Tuple[Any, Union[float, int]], bool]:
+    ) -> tuple[tuple[Any, Union[float, int]], bool]:
         try:
             (s, r), end = self.transition(state, action)
         except Exception as e:
@@ -159,7 +158,7 @@ class ModelFree:
         self,
         s_0: Any,
         a_0: Any,
-        policy: ModelFreePolicy = None,
+        policy: ModelFreePolicy | None = None,
         max_steps: int = MAX_STEPS,
     ) -> List[EpisodeStep]:
         policy = policy if policy else self.policy
@@ -168,7 +167,7 @@ class ModelFree:
         end = False
         step = 0
         s_t_1, a_t_1 = s_0, a_0
-        while (end != True) and (step < max_steps):
+        while (not end) and (step < max_steps):
             (s_t, r_t), end = self.transition(s_t_1, a_t_1)
             (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
             episode.append((_s, _a, _r))
@@ -181,7 +180,7 @@ class ModelFree:
 
     def step_transition(
         self, state: int, action: int
-    ) -> Tuple[Tuple[int, float], bool]:
+    ) -> tuple[tuple[int, float], bool]:
         s, a = self.states.from_index(state), self.actions.from_index(action)
         (s_t, r_t), end = self.transition(s, a)
         s_new = self.states.get_index(s_t)

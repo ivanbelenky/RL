@@ -8,6 +8,7 @@ dependencies = [
     "matplotlib>=3.10.8",
     "numpy>=2.4.0",
     "ruff>=0.14.10",
+    "tqdm>=4.67.1",
 ]
 
 [dependency-groups]
@@ -15,9 +16,10 @@ dev = [
     "basedpyright>=1.36.2",
     "ipykernel>=7.1.0",
     "ipython>=9.8.0",
+    "ty>=0.0.7",
 ]
 
-[tool.basedpyright]
-include = ["src"]
-extraPaths = ["../agate_utils/src"]
-typeCheckingMode = "strict"
+# [tool.basedpyright]
+#include = ["src"]
+#e xtraPaths = ["../agate_utils/src"]
+#typeCheckingMode = "strict"

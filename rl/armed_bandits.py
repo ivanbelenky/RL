@@ -7,10 +7,11 @@ from typing import List
 import numpy as np
 import numpy.random as rnd
 
-from rl.utils import Policy, RewardGenerator
+from rl.utils import Policy, RandomRewardGenerator
 
-
-GAUSSIAN = [RewardGenerator("normal", rnd.random(), rnd.random()) for _ in range(10)]
+GAUSSIAN = [
+    RandomRewardGenerator("normal", rnd.random(), rnd.random()) for _ in range(10)
+]
 NGAMES = 1
 NSTEPS = 1000
 
@@ -23,10 +24,9 @@ class EpsilonGreedyBanditPolicy(Policy):
         self.q_values = np.zeros(k) + self.offset
         self.N = np.zeros(k)
 
-    def __call__(self) -> int:
+    def __call__(self, state: int) -> int:
         if rnd.random() < self.eps:
             return rnd.randint(self.k)
-
         return np.argmax(self.q_values)
 
     def update_policy(self, action: int, reward: float) -> None:
@@ -108,7 +108,7 @@ class MultiArmedBandit:
     def __init__(
         self,
         k: int = 10,
-        reward_generators: List[RewardGenerator] = GAUSSIAN,
+        reward_generators: list[RandomRewardGenerator] = GAUSSIAN,
         n_games: int = NGAMES,
         policy: Policy = EGREEDY,
     ):

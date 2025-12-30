@@ -1,27 +1,27 @@
 from copy import deepcopy
-from typing import Sequence, Callable, Tuple, List, Any
+from typing import Any, Callable, List, Sequence
 
 import numpy as np
 from numpy.linalg import norm as lnorm
 from tqdm import tqdm
 
 from rl.approximators import (
-    Approximator,
     SGDWA,
+    Approximator,
+    EpsSoftSALPolicy,
     ModelFreeTL,
     ModelFreeTLPolicy,
-    EpsSoftSALPolicy,
     REINFORCEPolicy,
 )
 from rl.utils import (
-    _typecheck_all,
-    _get_sample_step,
-    _check_ranges,
-    Samples,
-    Transition,
     MAX_ITER,
     MAX_STEPS,
     TOL,
+    Samples,
+    Transition,
+    _check_ranges,
+    _get_sample_step,
+    _typecheck_all,
 )
 
 
@@ -89,7 +89,7 @@ def gradient_mc(
     random_state: Callable[[Any], Any],
     actions: Sequence[Any],
     v_hat: SGDWA,
-    q_hat: SGDWA = None,
+    q_hat: SGDWA | None = None,
     state_0: Any = None,
     action_0: Any = None,
     alpha: float = 0.05,
@@ -98,10 +98,10 @@ def gradient_mc(
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy = None,
+    policy: ModelFreeTLPolicy | None = None,
     tol: float = TOL,
-    eps: float = None,
-) -> Tuple[AVQPi, Samples]:
+    eps: float | None = None,
+) -> tuple[AVQPi, Samples]:
     """Gradient α-MC algorithm for estimating, and optimizing policies
 
     gradient_mc uses the gradient of VE to estimate the value of
@@ -149,9 +149,9 @@ def gradient_mc(
 
     Returns
     -------
-    vqpi : Tuple[VPi, QPi, Policy]
+    vqpi : tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
+    samples : tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the TODO:.
@@ -230,7 +230,7 @@ def semigrad_tdn(
     random_state: Callable[[Any], Any],
     actions: Sequence[Any],
     v_hat: SGDWA,
-    q_hat: SGDWA = None,
+    q_hat: SGDWA | None = None,
     state_0: Any = None,
     action_0: Any = None,
     alpha: float = 0.05,
@@ -240,10 +240,10 @@ def semigrad_tdn(
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy = None,
+    policy: ModelFreeTLPolicy | None = None,
     tol: float = TOL,
-    eps: float = None,
-) -> Tuple[AVQPi, Samples]:
+    eps: float | None = None,
+) -> tuple[AVQPi, Samples]:
     """Semi-Gradient n-step Temporal Difference
 
     Solver for the n-step temporal difference algorithm. The algorithm is
@@ -295,9 +295,9 @@ def semigrad_tdn(
 
     Returns
     -------
-    vqpi : Tuple[VPi, QPi, Policy]
+    vqpi : tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
+    samples : tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the TODO:.
@@ -414,10 +414,10 @@ def lstd(
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy = None,
+    policy: ModelFreeTLPolicy | None = None,
     tol: float = TOL,
-    eps: float = None,
-) -> Tuple[AVQPi, Samples]:
+    eps: float | None = None,
+) -> tuple[AVQPi, Samples]:
     """Least squares n-step temporal differnece
 
     Parameters
@@ -454,9 +454,9 @@ def lstd(
 
     Returns
     -------
-    vqpi : Tuple[VPi, QPi, Policy]
+    vqpi : tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
+    samples : tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the TODO:.
@@ -519,7 +519,7 @@ def diff_semigradn(
     policy: ModelFreeTLPolicy = None,
     tol: float = TOL,
     eps: float = None,
-) -> Tuple[AVQPi, Samples]:
+) -> tuple[AVQPi, Samples]:
     """Differential semi gradient n-step Sarsa for estimation and control.
 
     The average reward setting is one of that comes to solve many problems
@@ -567,9 +567,9 @@ def diff_semigradn(
 
     Returns
     -------
-    vqpi : Tuple[VPi, QPi, Policy]
+    vqpi : tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
+    samples : tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the Policy.
@@ -683,7 +683,7 @@ def semigrad_td_lambda(
     policy: ModelFreeTLPolicy = None,
     tol: float = TOL,
     eps: float = None,
-) -> Tuple[AVQPi, Samples]:
+) -> tuple[AVQPi, Samples]:
     """Semi-gradient TD(λ).
 
     Eligibility traces semi gradient TD(λ). This algorithms extends more
@@ -734,9 +734,9 @@ def semigrad_td_lambda(
 
     Returns
     -------
-    vqpi : Tuple[VPi, QPi, Policy]
+    vqpi : tuple[VPi, QPi, Policy]
         Value function, action-value function, policy and samples if any.
-    samples : Tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
+    samples : tuple[int, List[Vpi], List[Qpi], List[np.ndarray]]
         Samples taken during the simulation if any. The first element is the
         index of the iteration, the second is the value function, the third is
         the action-value function and the fourth is the Policy.
@@ -839,7 +839,7 @@ def reinforce_mc(
     transition: Transition,
     random_state: Callable,
     pi_hat: Approximator,
-    actions: Sequence[Any] = None,
+    actions: Sequence[Any] | None = None,
     state_0: Any = None,
     action_0: Any = None,
     alpha: float = 0.1,
@@ -847,9 +847,9 @@ def reinforce_mc(
     n_episodes: int = MAX_ITER,
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
-    policy: REINFORCEPolicy = None,
+    policy: REINFORCEPolicy | None = None,
     tol: float = TOL,
-) -> Tuple[REINFORCEPolicy, List[REINFORCEPolicy]]:
+) -> tuple[REINFORCEPolicy, List[REINFORCEPolicy]]:
     """MC Policy-Gradient control algorithm
 
     This algorithm must be used with differentiable policies. Regardless of the
