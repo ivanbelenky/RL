@@ -37,9 +37,10 @@ def vq_pi_iter_naive(
     max_iters: int = MAX_STEPS,
     samples: int = 1000,
 ) -> VQPi:
-    sample_step = _get_sample_step(samples, max_iters // 10)  # RULE OF THUMB
+    # TODO: to be used
+    _sample_step = _get_sample_step(samples, max_iters // 10)  # RULE OF THUMB
 
-    v, q = _vq_pi_iter_naive(mdp, policy, tol, max_iters, inplace, sample_step)
+    v, q = _vq_pi_iter_naive(mdp, policy, tol, max_iters, inplace)
 
     return VQPi((v, q, policy))
 
@@ -67,7 +68,6 @@ def _vq_pi_iter_naive[S: int, A: int](
     tol: float,
     max_iters: int,
     inplace: bool,
-    sample_step: int,
 ) -> tuple[Vpi, Qpi]:
     γ = mdp.gamma
     p_s = mdp.p_s
@@ -82,21 +82,17 @@ def _vq_pi_iter_naive[S: int, A: int](
         [[mdp.r_sa(s, a) for s in range(mdp.states.N)] for a in range(mdp.actions.N)]
     )  # AxS
 
-    n_iter, samples = 0, []
+    n_iter = 0
     while (n_iter < max_iters) and (diff_norm > tol):
         v_i_1 = v_i.copy()
         v_i = update_step(mdp, v_i, v_i_1, π_sa, r_sa, p_s, γ)
         diff_norm = lnorm(v_i - v_i_1)
         n_iter += 1
 
-        # TODO: fix this shit
-        # if n_iter % sample_step == 0:
-        #    samples.append(get_sample(mdp, v_i, None, policy, n_iter))
-
     vπ = v_i
     qπ = r_sa + (p_s @ vπ).T
 
-    return vπ, qπ  # TODO: eventually return samples, they are broken AF
+    return Vpi(vπ, idx=mdp.states), Qpi(qπ, idx=mdp.stateaction)
 
 
 def policy_iteration(
@@ -106,15 +102,14 @@ def policy_iteration(
     max_iters_eval: int = MAX_ITER,
     tol_opt: float = TOL,
     max_iters_opt: int = MAX_ITER,
-    samples: int = 1000,
 ) -> VQPi:
     (v_i_1, q_i_1, _) = vq_pi_iter_naive(
         mdp,
         policy,
         tol_eval,
         max_iters_eval,
-        samples=samples,
     )
+
     v_i, q_i = v_i_1.copy(), q_i_1.copy()
 
     diff_norm = 2 * tol_opt
@@ -126,12 +121,12 @@ def policy_iteration(
         q_i_1 = q_i.copy()
 
         policy.update_policy(q_i_1)
-        vq_i = vq_pi_iter_naive(mdp, policy, tol_eval, max_iters_eval)
+        (v_i, q_i, _) = vq_pi_iter_naive(mdp, policy, tol_eval, max_iters_eval)
 
         n_iter += 1
-        diff_norm = lnorm(v_i - v_i_1)
+        diff_norm = lnorm(v_i.v - v_i_1.v)
 
-    return vq_i
+    return VQPi((v_i, q_i, mdp.policy))
 
 
 def _inplace_step_vi(mdp, v_i, _, r_sa, p_s, γ):
@@ -157,9 +152,10 @@ def value_iteration(
     max_iters: int = MAX_ITER,
     samples: int = 1000,
 ) -> VQPi:
-    sample_step = _get_sample_step(samples, max_iters // 10)  # RULE OF THUMB
+    # TODO: to be used
+    _sample_step = _get_sample_step(samples, max_iters // 10)  # RULE OF THUMB
 
-    v, q = _value_iteration(mdp, policy, tol, max_iters, inplace, sample_step)
+    v, q = _value_iteration(mdp, policy, tol, max_iters, inplace)
 
     return VQPi((v, q, policy))
 
@@ -170,7 +166,6 @@ def _value_iteration(
     tol: float,
     max_iters: int,
     inplace: bool,
-    sample_step: int,
 ) -> tuple[Vpi, Qpi]:
     policy = policy if policy else mdp.policy
 
@@ -186,15 +181,12 @@ def _value_iteration(
         [[mdp.r_sa(s, a) for s in range(mdp.states.N)] for a in range(mdp.actions.N)]
     )  # AxS
 
-    n_iter, samples = 0, []
+    n_iter = 0
     while (n_iter < max_iters) and (diff_norm > tol):
         v_i_1 = v_i.copy()
         v_i, q_i = update_step(mdp, v_i, v_i_1, r_sa, p_s, γ)
         diff_norm = lnorm(v_i - v_i_1)
         n_iter += 1
-
-        # if n_iter % sample_step == 0:
-        #    samples.append(get_sample(mdp, v_i, q_i, policy, n_iter))
 
     policy.update_policy(q_i)
     return Vpi(v_i, mdp.states), Qpi(q_i, mdp.stateaction)
