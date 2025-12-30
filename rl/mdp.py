@@ -187,7 +187,6 @@ class MDP[S: int, A: int]:
         policy: MarkovPolicy | None = None,
     ):
         self.p_s: np.ndarray[self.SAS] = p_s  # transition function
-
         self.gamma: int | float = gamma
         self.reward_gen: MarkovReward = reward_gen
 
@@ -199,7 +198,6 @@ class MDP[S: int, A: int]:
             s=self.states.N,
             a=self.actions.N,
         )
-
         self._validate_attr()
 
     def _validate_attr(self):

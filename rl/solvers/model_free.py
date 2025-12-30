@@ -63,8 +63,8 @@ def alpha_mc(
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreePolicy = None,
-    eps: float = None,
+    policy: ModelFreePolicy | None = None,
+    eps: float | None = None,
 ) -> tuple[VQPi, Samples]:
     """α-MC state and action-value function estimation, policy optimization
 
@@ -234,9 +234,9 @@ def off_policy_mc(
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreePolicy = None,
-    eps: float = None,
-    b: ModelFreePolicy = None,
+    policy: ModelFreePolicy | None = None,
+    eps: float | None = None,
+    b: ModelFreePolicy | None = None,
 ) -> tuple[VQPi, Samples]:
     """Off-policy Monte Carlo state and action value function estimation, policy
 
@@ -400,8 +400,8 @@ def tdn(
     n: int = 1,
     alpha: float = 0.05,
     n_episodes: int = MAX_ITER,
-    policy: ModelFreePolicy = None,
-    eps: float = None,
+    policy: ModelFreePolicy | None = None,
+    eps: float | None = None,
     optimize: bool = False,
     method: str = "sarsa",
     samples: int = 1000,
@@ -745,8 +745,8 @@ def n_tree_backup(
     n: int = 1,
     alpha: float = 0.05,
     n_episodes: int = MAX_ITER,
-    policy: ModelFreePolicy = None,
-    eps: float = None,
+    policy: ModelFreePolicy | None = None,
+    eps: float | None = None,
     optimize: bool = False,
     samples: int = 1000,
     max_steps: int = MAX_STEPS,
