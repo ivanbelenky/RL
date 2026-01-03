@@ -176,6 +176,9 @@ class RandomRewardGenerator:
     def __call__(self):
         return self.gen_reward()
 
+    def mean(self, N: int = 1000) -> float:
+        return np.mean([self.gen_reward() for i in range(N)])
+
     @classmethod
     def generate(cls, distribution="normal", *args, **kwargs) -> float:
         generator = cls.DISTRIBUTION.get(distribution)

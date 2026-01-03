@@ -10,7 +10,7 @@ import numpy.random as rnd
 from rl.utils import Policy, RandomRewardGenerator
 
 GAUSSIAN = [
-    RandomRewardGenerator("normal", rnd.random(), rnd.random()) for _ in range(10)
+    RandomRewardGenerator("gaussian", rnd.random(), rnd.random()) for _ in range(10)
 ]
 NGAMES = 1
 NSTEPS = 1000
@@ -27,7 +27,7 @@ class EpsilonGreedyBanditPolicy(Policy):
     def __call__(self, state: int) -> int:
         if rnd.random() < self.eps:
             return rnd.randint(self.k)
-        return np.argmax(self.q_values)
+        return np.argmax(self.q_values)  # type: ignore
 
     def update_policy(self, action: int, reward: float) -> None:
         N = self.N[action] + 1
@@ -71,7 +71,12 @@ class UCBPolicy(Policy):
 
 
 class AlphaEpsilonGreedyBanditPolicy(EpsilonGreedyBanditPolicy):
-    def __init__(self, k: int = 10, epsilon: int = 0.1, alpha: int = 0.1):
+    def __init__(
+        self,
+        k: int = 10,
+        epsilon: int | float = 0.1,
+        alpha: int | float = 0.1,
+    ):
         super().__init__(k, epsilon)
         self.alpha = alpha
 
