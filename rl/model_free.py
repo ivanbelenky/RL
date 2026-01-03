@@ -5,9 +5,7 @@ RL - Copyright © 2023 Iván Belenky @Leculette
 from typing import (
     Any,
     Callable,
-    List,
     Sequence,
-    Union,
 )
 
 import numpy as np
@@ -24,7 +22,7 @@ from rl.utils import (
 
 
 class ModelFreePolicy(Policy):
-    def __init__(self, A: Union[Sequence[Any], int], S: Union[Sequence[Any], int]):
+    def __init__(self, A: Sequence[Any] | int, S: Sequence[Any] | int):
         if not isinstance(A, int):
             A = len(A)
         if not isinstance(S, int):
@@ -129,7 +127,7 @@ class ModelFree:
         self,
         state: Any,
         action: Any,
-    ) -> tuple[tuple[Any, Union[float, int]], bool]:
+    ) -> tuple[tuple[Any, float | int], bool]:
         try:
             (s, r), end = self.transition(state, action)
         except Exception as e:
@@ -156,7 +154,7 @@ class ModelFree:
         s_0: Any,
         a_0: Any,
         max_steps: int = MAX_STEPS,
-    ) -> List[EpisodeStep]:
+    ) -> list[EpisodeStep]:
         episode = []
         end = False
         step = 0
