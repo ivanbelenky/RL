@@ -192,4 +192,4 @@ def _value_iteration(
     return Vpi(v_i, mdp.states), Qpi(q_i, mdp.stateaction)
 
 
-from rl.mdp import MDP, MarkovPolicy  # noqa
+from rl.model_based import MDP, MarkovPolicy  # noqa

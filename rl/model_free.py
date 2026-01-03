@@ -153,8 +153,10 @@ class ModelFree:
         self,
         s_0: Any,
         a_0: Any,
+        policy: ModelFreePolicy | None = None,
         max_steps: int = MAX_STEPS,
     ) -> list[EpisodeStep]:
+        policy = self.policy or policy
         episode = []
         end = False
         step = 0

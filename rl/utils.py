@@ -106,7 +106,8 @@ class Qpi(_TabularValues):
 
 
 VQPi = NewType("VQPi", tuple[Vpi, Qpi, Policy])
-Samples = NewType("Samples", tuple[int, list[Vpi], list[Qpi], list[Policy]])
+Sample = NewType("Samples", tuple[int, Vpi, Qpi, Policy])
+Samples = NewType("Samples", list[Sample])
 Transition = Callable[[Any, Any], tuple[tuple[Any, float], bool]]
 EpisodeStep = NewType("EpisodeStep", tuple[int, int, float])
 
