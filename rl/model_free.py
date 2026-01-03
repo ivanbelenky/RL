@@ -81,15 +81,12 @@ class ModelFree:
         gamma: float = 1,
         policy: ModelFreePolicy | None = None,
     ):
-        self.policy = policy
         self.states = State(states)
         self.actions = Action(actions)
         self.stateaction = StateAction([(s, a) for s, a in zip(states, actions)])
         self.transition = transition
         self.gamma = gamma
-        self.policy = (
-            policy if policy else ModelFreePolicy(self.actions.N, self.states.N)
-        )
+        self.policy = policy or ModelFreePolicy(self.actions.N, self.states.N)
 
         self._validate_transition()
 
@@ -158,11 +155,8 @@ class ModelFree:
         self,
         s_0: Any,
         a_0: Any,
-        policy: ModelFreePolicy | None = None,
         max_steps: int = MAX_STEPS,
     ) -> List[EpisodeStep]:
-        policy = policy if policy else self.policy
-
         episode = []
         end = False
         step = 0
@@ -171,7 +165,7 @@ class ModelFree:
             (s_t, r_t), end = self.transition(s_t_1, a_t_1)
             (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
             episode.append((_s, _a, _r))
-            a_t = policy(self.states.get_index(s_t))
+            a_t = self.policy(self.states.get_index(s_t))
             s_t_1, a_t_1 = s_t, self.actions.from_index(a_t)
 
             step += 1
