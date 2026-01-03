@@ -5,9 +5,7 @@ RL - Copyright © 2023 Iván Belenky @Leculette
 from typing import (
     Any,
     Callable,
-    List,
     Sequence,
-    Union,
 )
 
 import numpy as np
@@ -24,7 +22,7 @@ from rl.utils import (
 
 
 class ModelFreePolicy(Policy):
-    def __init__(self, A: Union[Sequence[Any], int], S: Union[Sequence[Any], int]):
+    def __init__(self, A: Sequence[Any] | int, S: Sequence[Any] | int):
         if not isinstance(A, int):
             A = len(A)
         if not isinstance(S, int):
@@ -81,15 +79,12 @@ class ModelFree:
         gamma: float = 1,
         policy: ModelFreePolicy | None = None,
     ):
-        self.policy = policy
         self.states = State(states)
         self.actions = Action(actions)
         self.stateaction = StateAction([(s, a) for s, a in zip(states, actions)])
         self.transition = transition
         self.gamma = gamma
-        self.policy = (
-            policy if policy else ModelFreePolicy(self.actions.N, self.states.N)
-        )
+        self.policy = policy or ModelFreePolicy(self.actions.N, self.states.N)
 
         self._validate_transition()
 
@@ -132,7 +127,7 @@ class ModelFree:
         self,
         state: Any,
         action: Any,
-    ) -> tuple[tuple[Any, Union[float, int]], bool]:
+    ) -> tuple[tuple[Any, float | int], bool]:
         try:
             (s, r), end = self.transition(state, action)
         except Exception as e:
@@ -160,9 +155,8 @@ class ModelFree:
         a_0: Any,
         policy: ModelFreePolicy | None = None,
         max_steps: int = MAX_STEPS,
-    ) -> List[EpisodeStep]:
-        policy = policy if policy else self.policy
-
+    ) -> list[EpisodeStep]:
+        policy = self.policy or policy
         episode = []
         end = False
         step = 0
@@ -171,7 +165,7 @@ class ModelFree:
             (s_t, r_t), end = self.transition(s_t_1, a_t_1)
             (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
             episode.append((_s, _a, _r))
-            a_t = policy(self.states.get_index(s_t))
+            a_t = self.policy(self.states.get_index(s_t))
             s_t_1, a_t_1 = s_t, self.actions.from_index(a_t)
 
             step += 1

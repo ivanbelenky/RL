@@ -2,7 +2,7 @@
 RL - Copyright © 2023 Iván Belenky @Leculette
 """
 
-from typing import Any, Sequence
+from typing import Any, Literal, Sequence
 
 import numpy as np
 from tqdm import tqdm
@@ -12,6 +12,7 @@ from rl.utils import (
     MAX_ITER,
     MAX_STEPS,
     Qpi,
+    Sample,
     Samples,
     Transition,
     Vpi,
@@ -22,7 +23,14 @@ from rl.utils import (
 )
 
 
-def get_sample(MF, v, q, π, n_episode, optimize):
+def get_sample(
+    MF: ModelFree,
+    v: np.ndarray,
+    q: np.ndarray,
+    π: ModelFreePolicy,
+    n_episode: int,
+    optimize: bool,
+) -> tuple[int, Vpi, Qpi, ModelFreePolicy | None]:
     _idx = n_episode
     _v, _q = Vpi(v.copy(), MF.states), Qpi(q.copy(), MF.stateaction)
     _pi = None
@@ -32,14 +40,19 @@ def get_sample(MF, v, q, π, n_episode, optimize):
     return (_idx, _v, _q, _pi)
 
 
-def _set_s0_a0(MF, s, a):
+def _set_s0_a0(MF: ModelFree, s: int, a: int) -> tuple[int, int]:
     s_0, a_0 = MF.random_sa()
     s_0 = s_0 if not s else s
     a_0 = a_0 if not a else a
     return s_0, a_0
 
 
-def _set_policy(policy, eps, actions, states):
+def _set_policy(
+    policy: ModelFreePolicy | None,
+    eps: int | float | None,
+    actions: Sequence[Any],
+    states: Sequence[Any],
+):
     if not policy and eps:
         _typecheck_all(constants=[eps])
         _check_ranges(values=[eps], ranges=[(0, 1)])
@@ -134,7 +147,7 @@ def alpha_mc(
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
-    v, q, samples = _visit_monte_carlo(
+    v, q, final_samples = _visit_monte_carlo(
         model,
         first_visit,
         exploring_starts,
@@ -146,7 +159,7 @@ def alpha_mc(
         sample_step,
     )
 
-    return VQPi((v, q, model.policy.pi)), samples
+    return VQPi((v, q, model.policy)), final_samples
 
 
 def _mc_step(v, q, t, s_t, a_t, s, a, n_s, n_sa, G, first_visit):
@@ -176,21 +189,21 @@ def _mc_step_α(v, q, t, s_t, a_t, s, a, α, G, first_visit):
 
 
 def _visit_monte_carlo(
-    MF,
-    first_visit,
-    exploring_starts,
-    use_N,
-    alpha,
-    n_episodes,
-    max_steps,
-    optimize,
-    sample_step,
-):
+    MF: ModelFree,
+    first_visit: bool,
+    exploring_starts: bool,
+    use_N: bool,
+    alpha: float,
+    n_episodes: int,
+    max_steps: int,
+    optimize: bool,
+    sample_step: int,
+) -> tuple[Vpi, Qpi, Samples]:
     π = MF.policy
     γ = MF.gamma
     α = alpha
 
-    samples = []
+    samples: list[Sample] = []
 
     v, q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
     if use_N:
@@ -202,7 +215,7 @@ def _visit_monte_carlo(
         if exploring_starts:
             s_0, a_0 = MF.random_sa(value=True)
 
-        episode = MF.generate_episode(s_0, a_0, π, max_steps)
+        episode = MF.generate_episode(s_0, a_0, max_steps=max_steps)
         sar = np.array(episode)
         s, a, _ = sar.T
 
@@ -218,9 +231,10 @@ def _visit_monte_carlo(
                 π.update_policy(q, s_t)
 
         if sample_step and n_episode % sample_step == 0:
-            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+            (idx, s_v, s_q, sample) = get_sample(MF, v, q, π, n_episode, optimize)
+            samples.append(Sample((idx, s_v, s_q, sample)))
 
-    return v, q, samples
+    return v, q, Samples(samples)
 
 
 def off_policy_mc(
@@ -306,7 +320,7 @@ def off_policy_mc(
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
-    v, q, samples = _off_policy_monte_carlo(
+    v, q, final_samples = _off_policy_monte_carlo(
         model,
         b,
         int(n_episodes),
@@ -317,7 +331,7 @@ def off_policy_mc(
         sample_step,
     )
 
-    return VQPi((v, q, policy)), samples
+    return VQPi((v, q, policy)), final_samples
 
 
 def _mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q, first_visit, ordinary):
@@ -346,13 +360,20 @@ def _mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q, first_visit, ordinary):
 
 
 def _off_policy_monte_carlo(
-    MF, off_policy, n_episodes, max_steps, first_visit, ordinary, optimize, sample_step
-):
+    MF: ModelFree,
+    off_policy: ModelFreePolicy,
+    n_episodes: int,
+    max_steps: int,
+    first_visit: bool,
+    ordinary: bool,
+    optimize: bool,
+    sample_step: int,
+) -> tuple[Vpi, Qpi, Samples]:
     γ = MF.gamma
     b = off_policy
     π = MF.policy
 
-    samples = []
+    samples: Samples = Samples([])
 
     v, q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
     c, c_q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
@@ -385,9 +406,10 @@ def _off_policy_monte_carlo(
                 π.update_policy(q, s_t)
 
         if sample_step and n_episode % sample_step == 0:
-            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+            (idx, s_v, s_q, sample) = get_sample(MF, v, q, π, n_episode, optimize)
+            samples.append(Sample((idx, s_v, s_q, sample)))
 
-    return v, q, samples
+    return v, q, Samples(samples)
 
 
 def tdn(
@@ -508,14 +530,27 @@ def tdn(
         int(n_episodes),
         max_steps,
         optimize,
-        method,
+        method,  # type: ignore
         sample_step,
     )
 
     return VQPi((v, q, policy)), samples
 
 
-def _td_step(s, a, r, t, T, n, v, q, γ, α, gammatron, π=None):
+def _td_step(
+    s: np.ndarray,
+    a: np.ndarray,
+    r: np.ndarray,
+    t: int,
+    T: int,
+    n: int,
+    v: np.ndarray,
+    q: np.ndarray,
+    γ: float,
+    α: float,
+    gammatron: np.ndarray,
+    _: ModelFreePolicy | None = None,
+):
     """td step update"""
     s_t, a_t, rr = s[t], a[t], r[t : t + n]
     G = np.dot(gammatron[: rr.shape[0]], rr)
@@ -529,7 +564,20 @@ def _td_step(s, a, r, t, T, n, v, q, γ, α, gammatron, π=None):
     q[q_key] = q[q_key] + α * (G_q - q[q_key])
 
 
-def _td_qlearning(s, a, r, t, T, n, v, q, γ, α, gammatron, π=None):
+def _td_qlearning(
+    s: np.ndarray,
+    a: np.ndarray,
+    r: np.ndarray,
+    t: int,
+    T: int,
+    n: int,
+    v: np.ndarray,
+    q: np.ndarray,
+    γ: float,
+    α: float,
+    gammatron: np.ndarray,
+    π: ModelFreePolicy | None = None,
+):
     """td qlearning update"""
     s_t, a_t, rr = s[t], a[t], r[t : t + n]
     G = np.dot(gammatron[: rr.shape[0]], rr)
@@ -541,7 +589,20 @@ def _td_qlearning(s, a, r, t, T, n, v, q, γ, α, gammatron, π=None):
     q[q_key] = q[q_key] + α * (G - q[q_key])
 
 
-def _td_expected_sarsa(s, a, r, t, T, n, v, q, γ, α, gammatron, π=None):
+def _td_expected_sarsa(
+    s: np.ndarray,
+    a: np.ndarray,
+    r: np.ndarray,
+    t: int,
+    T: int,
+    n: int,
+    v: np.ndarray,
+    q: np.ndarray,
+    γ: float,
+    α: float,
+    gammatron: np.ndarray,
+    π: ModelFreePolicy,
+):
     s_t, a_t, rr = s[t], a[t], r[t : t + n]
     G = np.dot(gammatron[: rr.shape[0]], rr)
     if t + n < T:
@@ -560,7 +621,16 @@ STEP_MAP = {
 
 
 def _tdn_onoff(
-    MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, method, sample_step
+    MF: ModelFree,
+    s_0: int,
+    a_0: int,
+    n: int,
+    alpha: float,
+    n_episodes: int,
+    max_steps: int,
+    optimize: bool,
+    method: Literal["sarsa_on", "sarsa", "qlearning", "expected_sarsa", "dqlearning"],
+    sample_step: int,
 ):
     """N-temporal differences algorithm.
 
@@ -610,7 +680,22 @@ def _tdn_onoff(
     return v, q, samples
 
 
-def _td_dq_step(s, a, r, t, T, n, v1, q1, v2, q2, γ, α, gammatron, π):
+def _td_dq_step(
+    s: np.ndarray,
+    a: np.ndarray,
+    r: np.ndarray,
+    t: int,
+    T: int,
+    n: int,
+    v1: np.ndarray,
+    q1: np.ndarray,
+    v2: np.ndarray,
+    q2: np.ndarray,
+    γ: float,
+    α: float,
+    gammatron: np.ndarray,
+    π: ModelFreePolicy,
+):
     """td step update"""
     s_t, a_t, rr = s[t], a[t], r[t : t + n]
     G = np.dot(gammatron[: rr.shape[0]], rr)
@@ -625,7 +710,16 @@ def _td_dq_step(s, a, r, t, T, n, v1, q1, v2, q2, γ, α, gammatron, π):
 
 
 def _double_q(
-    MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, method, sample_step
+    MF: ModelFree,
+    s_0: int,
+    a_0: int,
+    n: int,
+    alpha: float,
+    n_episodes: int,
+    max_steps: int,
+    optimize: bool,
+    method: Literal["sarsa_on", "sarsa", "qlearning", "expected_sarsa", "dqlearning"],
+    sample_step: int,
 ):
     π, α, γ = MF.policy, alpha, MF.gamma
     gammatron = np.array([γ**i for i in range(n)])
@@ -665,7 +759,16 @@ def _double_q(
 
 
 def _tdn_on(
-    MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, method, sample_step
+    MF: ModelFree,
+    s_0: int,
+    a_0: int,
+    n: int,
+    alpha: float,
+    n_episodes: int,
+    max_steps: int,
+    optimize: bool,
+    method: Literal["sarsa_on", "sarsa", "qlearning", "expected_sarsa", "dqlearning"],
+    sample_step: int,
 ):
     """N-temporal differences algorithm for learning.
 
@@ -829,7 +932,15 @@ def n_tree_backup(
 
 
 def _n_tree_backup(
-    MF, s_0, a_0, n, alpha, n_episodes, max_steps, optimize, sample_step
+    MF,
+    s_0,
+    a_0,
+    n,
+    alpha,
+    n_episodes,
+    max_steps,
+    optimize,
+    sample_step,
 ):
     π, α, γ = MF.policy, alpha, MF.gamma
 
