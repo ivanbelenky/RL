@@ -1,7 +1,7 @@
 import copy
 from abc import ABC, abstractmethod
 from time import perf_counter
-from typing import Any, Callable, List, Optional, Sequence, Union
+from typing import Any, Callable, List, Optional, Sequence, Union, cast, override
 
 import numpy as np
 
@@ -47,7 +47,7 @@ class Approximator(ABC):
     """
 
     @abstractmethod
-    def __call__(self, s: Any, *args, **kwargs) -> float:
+    def __call__(self, *args, **kwargs) -> float:
         """Return the value of the approximation"""
         raise NotImplementedError
 
@@ -65,6 +65,17 @@ class Approximator(ABC):
         if grad:
             return True
         return False
+
+
+class DifferentiableApproximator(Approximator):
+    @abstractmethod
+    def grad(self, *args, **kwargs):
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def w(self) -> Any:
+        raise NotImplementedError
 
 
 class ModelFreeTLPolicy(Policy):
@@ -85,8 +96,11 @@ class ModelFreeTLPolicy(Policy):
     def update_policy(self, *args, **kwargs):
         self.q_hat.update(*args, **kwargs)
 
-    def __call__(self, state: Any):
-        action_idx = np.argmax([self.q_hat((state, a)) for a in self.actions])
+    @override
+    def __call__(self, state: Any, /) -> float:
+        action_idx = cast(
+            int, np.argmax([self.q_hat((state, a)) for a in self.actions])
+        )
         return self.actions[action_idx]
 
 
@@ -102,11 +116,11 @@ class EpsSoftSALPolicy(ModelFreeTLPolicy):
 
 
 class REINFORCEPolicy(ModelFreeTLPolicy):
-    def __init__(self, actions: Sequence[Any], pi_hat: Approximator):
+    def __init__(self, actions: Sequence[Any], pi_hat: DifferentiableApproximator):
         """Must be a differential approximator"""
         self.actions = actions
         self.pi_hat = pi_hat
-        if not self.pi_hat.is_differentiable():
+        if not isinstance(self.pi_hat, DifferentiableApproximator):
             raise TypeError("Policy approximator pi_hat must be differentiable")
 
     def grad_lnpi(self, s, a):
@@ -126,7 +140,7 @@ class REINFORCEPolicy(ModelFreeTLPolicy):
         pi_sa = np.array([e_hsa[i] / denom for i in range(len(self.actions))])
         return pi_sa
 
-    def __call__(self, s: Any) -> float:
+    def __call__(self, s: Any, /) -> float:
         """default softmax implementation"""
         return np.random.choice(self.actions, p=self.pi_sa(s))
 
@@ -177,7 +191,7 @@ class ModelFreeTL:
         self,
         s_0: Any,
         a_0: Any,
-        policy: ModelFreeTLPolicy = None,
+        policy: ModelFreeTLPolicy | None = None,
         max_steps: int = MAX_STEPS,
     ) -> List[EpisodeStep]:
         """Generate an episode using given policy if any, otherwise
@@ -202,7 +216,7 @@ class ModelFreeTL:
         return self.transition(state, action)
 
 
-class SGDWA(Approximator):
+class SGDWA(DifferentiableApproximator):
     """Stochastic Gradient Descent Weight-Vector Approximator
     for MSVE (mean square value error).
 
@@ -212,9 +226,7 @@ class SGDWA(Approximator):
     mean square value error VE, the prediction objective.
     """
 
-    def __init__(
-        self, fs: int = None, basis: Optional[Callable[[Any], np.ndarray]] = None
-    ):
+    def __init__(self, fs: int, basis: Optional[Callable[[Any], np.ndarray]] = None):
         """
         Parameters
         ----------
@@ -226,9 +238,21 @@ class SGDWA(Approximator):
             it will be probably fail miserably.
         """
         self.fs = fs
-        self.basis_name = basis.__name__
+
+        self.basis_name = (
+            "identity" if not basis else getattr(basis, "__name__", repr(basis))
+        )
         self.basis = basis if basis else lambda x: x
-        self.w = np.ones(self.fs) * W_INIT
+        self._w = np.ones(self.fs) * W_INIT
+
+    @property
+    def w(self):
+        return self._w
+
+    @w.setter
+    def w(self, new_w):
+        self._w = new_w
+        return self._w
 
     def grad(self, x: Any) -> np.ndarray:
         """Return the gradient of the approximation"""
@@ -250,7 +274,7 @@ class SGDWA(Approximator):
         self.w = self.w + dw
         return dw
 
-    def __call__(self, x):
+    def __call__(self, x: Any, /) -> float:
         return np.dot(self.w, self.basis(x))
 
 

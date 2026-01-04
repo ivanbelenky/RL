@@ -8,6 +8,7 @@ from tqdm import tqdm
 from rl.approximators import (
     SGDWA,
     Approximator,
+    DifferentiableApproximator,
     EpsSoftSALPolicy,
     ModelFreeTL,
     ModelFreeTLPolicy,
@@ -843,7 +844,7 @@ def _td_lambda(
 def reinforce_mc(
     transition: Transition,
     random_state: Callable,
-    pi_hat: Approximator,
+    pi_hat: DifferentiableApproximator,
     actions: Sequence[Any],
     state_0: Any = None,
     action_0: Any = None,
