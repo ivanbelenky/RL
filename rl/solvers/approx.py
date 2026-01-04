@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Callable, List, Sequence
+from typing import Any, Callable, List, Never, Sequence
 
 import numpy as np
 from numpy.linalg import norm as lnorm
@@ -406,6 +406,9 @@ def _semigrad_tdn(
 def lstd(
     transition: Transition,
     random_state: Callable[[Any], Any],
+    actions: Sequence[Any],
+    v_hat: SGDWA,
+    q_hat: SGDWA | None = None,
     state_0: Any = None,
     action_0: Any = None,
     alpha: float = 0.05,
@@ -417,7 +420,7 @@ def lstd(
     policy: ModelFreeTLPolicy | None = None,
     tol: float = TOL,
     eps: float | None = None,
-) -> tuple[AVQPi, Samples]:
+) -> Never:  # tuple[AVQPi, Samples]:
     """Least squares n-step temporal differnece
 
     Parameters
@@ -466,7 +469,9 @@ def lstd(
     TransitionError: If any of the arguments is not of the correct type.
     """
 
-    # policy = _set_policy(policy, eps, actions, approximator)
+    raise NotImplementedError("LSTD is not implemented")
+
+    policy = _set_policy(policy, eps, actions, v_hat, q_hat)
 
     _typecheck_all(
         transition=transition,
@@ -506,19 +511,19 @@ def diff_semigradn(
     transition: Transition,
     random_state: Callable[[Any], Any],
     v_hat: SGDWA,
-    q_hat: SGDWA = None,
-    actions: Sequence[Any] = None,
+    q_hat: SGDWA | None = None,
+    actions: Sequence[Any] | None = None,
     state_0: Any = None,
     action_0: Any = None,
     alpha: float = 0.1,
     beta: float = 0.1,
     n: int = 1,
-    T: int = 1e5,
+    T: int = int(1e5),
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy = None,
+    policy: ModelFreeTLPolicy | None = None,
     tol: float = TOL,
-    eps: float = None,
+    eps: float | None = None,
 ) -> tuple[AVQPi, Samples]:
     """Differential semi gradient n-step Sarsa for estimation and control.
 
@@ -669,20 +674,20 @@ def semigrad_td_lambda(
     transition: Transition,
     random_state: Callable,
     v_hat: SGDWA,
-    q_hat: SGDWA = None,
-    actions: Sequence[Any] = None,
+    q_hat: SGDWA | None = None,
+    actions: Sequence[Any] | None = None,
     state_0: Any = None,
     action_0: Any = None,
     alpha: float = 0.1,
     lambdaa: float = 0.1,
     gamma: float = 0.9,
-    n_episodes: int = 1e5,
-    max_steps: int = 1e3,
+    n_episodes: int = int(1e5),
+    max_steps: int = int(1e3),
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy = None,
+    policy: ModelFreeTLPolicy | None = None,
     tol: float = TOL,
-    eps: float = None,
+    eps: float | None = None,
 ) -> tuple[AVQPi, Samples]:
     """Semi-gradient TD(λ).
 
@@ -759,7 +764,7 @@ def semigrad_td_lambda(
         ranges=[(0, 1), (0, 1), (0, 1), (1, np.inf), (1, 1001)],
     )
 
-    sample_step = _get_sample_step(samples, T)
+    sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFreeTL(transition, random_state, policy)
     vh, qh, samples = _td_lambda(
@@ -839,7 +844,7 @@ def reinforce_mc(
     transition: Transition,
     random_state: Callable,
     pi_hat: Approximator,
-    actions: Sequence[Any] | None = None,
+    actions: Sequence[Any],
     state_0: Any = None,
     action_0: Any = None,
     alpha: float = 0.1,
