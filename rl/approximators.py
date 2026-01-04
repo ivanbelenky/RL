@@ -187,7 +187,7 @@ class ModelFreeTL:
         end = False
         step = 0
         s_t_1, a_t_1 = s_0, a_0
-        while (end != True) and (step < max_steps):
+        while (not end) and (step < max_steps):
             (s_t, r_t), end = self.transition(s_t_1, a_t_1)
             episode.append((s_t_1, a_t_1, r_t))
             a_t = policy(s_t)
