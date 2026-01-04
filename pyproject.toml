@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=2.4.0",
     "ruff>=0.14.10",
     "tqdm>=4.67.1",
+    "ty>=0.0.7",
 ]
 
 [dependency-groups]
