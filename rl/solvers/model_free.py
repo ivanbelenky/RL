@@ -40,7 +40,7 @@ def get_sample(
     return (_idx, _v, _q, _pi)
 
 
-def _set_s0_a0(MF: ModelFree, s: int, a: int) -> tuple[int, int]:
+def _set_s0_a0(MF: ModelFree, s: int | None, a: int | None) -> tuple[int, int]:
     s_0, a_0 = MF.random_sa()
     s_0 = s_0 if not s else s
     a_0 = a_0 if not a else a

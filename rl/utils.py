@@ -4,11 +4,10 @@ import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, Literal, NewType, Self, Sequence, cast
+from typing import Any, Callable, Literal, NewType, Self, Sequence
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.axes import Axes
 
 from rl.types import SizedIterable
 
@@ -24,7 +23,7 @@ class Policy(ABC):
         pass
 
     @abstractmethod
-    def __call__(self, *args, **kwargs) -> int:
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError
 
     @abstractmethod
@@ -57,7 +56,7 @@ class _TabularIndexer:
     def from_indexable(cls, indexable: _TabularIndexable):
         match indexable:
             case np.ndarray():
-                return cls(indexable)
+                return cls(indexable)  # type: ignore NOTE: error will be raised downstream if indexable is a non dimensional array
             case int():
                 return cls([i for i in range(indexable)])
             case _:
@@ -83,10 +82,10 @@ class _TabularValues:
     def __init__(self, values: np.ndarray, idx: _TabularIndexer | _TabularIndexable):
         self.v = values
         if not isinstance(idx, _TabularIndexer):
-            self.idx = _TabularIndexer.from_indexable(idx)
+            self.idx: _TabularIndexer = _TabularIndexer.from_indexable(idx)
 
-        self.idx = idx
-        self.idx_val = {k: v for k, v in zip(idx.index.keys(), values)}
+        self.idx: _TabularIndexer = idx
+        self.idx_val = {k: v for k, v in zip(self.idx.index.keys(), values)}
 
     def values(self):
         return self.v
@@ -106,7 +105,7 @@ class Qpi(_TabularValues):
 
 
 VQPi = NewType("VQPi", tuple[Vpi, Qpi, Policy])
-Sample = NewType("Samples", tuple[int, Vpi, Qpi, Policy])
+Sample = NewType("Sample", tuple[int, Vpi, Qpi, Policy | None])
 Samples = NewType("Samples", list[Sample])
 Transition = Callable[[Any, Any], tuple[tuple[Any, float], bool]]
 EpisodeStep = NewType("EpisodeStep", tuple[int, int, float])
@@ -156,7 +155,7 @@ RandomDistributionT = Literal[
 
 
 class RandomRewardGenerator:
-    DISTRIBUTION = {
+    DISTRIBUTION: dict[RandomDistributionT, Callable] = {
         "bernoulli": np.random.binomial,
         "gaussian": np.random.normal,
         "uniform": np.random.uniform,
@@ -168,7 +167,7 @@ class RandomRewardGenerator:
 
     def __init__(self, distribution: RandomDistributionT, *d_args, **d_kwargs):
         self.gen_reward = partial(
-            self.DISTRIBUTION.get(distribution),
+            self.DISTRIBUTION[distribution],
             *d_args,
             **d_kwargs,
         )
@@ -180,7 +179,12 @@ class RandomRewardGenerator:
         return np.mean([self.gen_reward() for i in range(N)])
 
     @classmethod
-    def generate(cls, distribution="normal", *args, **kwargs) -> float:
+    def generate(
+        cls,
+        distribution: RandomDistributionT = "gaussian",
+        *args: Any,
+        **kwargs: Any,
+    ) -> float:
         generator = cls.DISTRIBUTION.get(distribution)
         if not generator:
             raise ValueError(f"Invalid distribution: {distribution}")
@@ -243,7 +247,7 @@ class UCTree:
                     )
 
         fig = plt.figure(figsize=(10, 10))
-        ax = cast(Axes, fig.add_subplot(111))
+        ax = fig.add_subplot(111)
         ax.set_xticks([])  # type: ignore
         ax.set_yticks([])  # type: ignore
         for node in treenodes:
