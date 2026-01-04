@@ -56,7 +56,7 @@ class _TabularIndexer:
     def from_indexable(cls, indexable: _TabularIndexable):
         match indexable:
             case np.ndarray():
-                return cls(indexable)  # type: ignore NOTE: error will be raised downstream if indexable is not an array
+                return cls(indexable)  # type: ignore NOTE: error will be raised downstream if indexable is a non dimensional array
             case int():
                 return cls([i for i in range(indexable)])
             case _:

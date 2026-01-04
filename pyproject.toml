@@ -19,7 +19,3 @@ dev = [
     "ty>=0.0.7",
 ]
 
-# [tool.basedpyright]
-#include = ["src"]
-#e xtraPaths = ["../agate_utils/src"]
-#typeCheckingMode = "strict"
