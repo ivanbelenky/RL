@@ -14,7 +14,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "basedpyright>=1.36.2",
     "ipykernel>=7.1.0",
     "ipython>=9.8.0",
     "ty>=0.0.7",
