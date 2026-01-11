@@ -248,8 +248,8 @@ class UCTree:
 
         fig = plt.figure(figsize=(10, 10))
         ax = fig.add_subplot(111)
-        ax.set_xticks([])  # type: ignore
-        ax.set_yticks([])  # type: ignore
+        ax.set_xticks([])
+        ax.set_yticks([])
         for node in treenodes:
             ax.scatter(node[0], node[1], color="white", s=1)
         for line in lines:
