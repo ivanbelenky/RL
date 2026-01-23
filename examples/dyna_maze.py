@@ -1,10 +1,13 @@
-import numpy as np
+from typing import cast
+
 import matplotlib.pyplot as plt
+import numpy as np
+
+from rl import ModelFree, ModelFreePolicy, dynaq
 
 plt.style.use("dark_background")
 
-from rl import dynaq, ModelFree
-
+MAX_STEPS = 2000
 GRID_HEIGHT, GRID_WIDTH = 6, 9
 START_XY, GOAL_XY = (0, 3), (8, 5)
 OBSTACLES = [(2, 2), (2, 3), (2, 4), (5, 1), (7, 3), (7, 4), (7, 5)]
@@ -45,7 +48,7 @@ def obstacle_maze(state, action):
     return (state_n, 0), False
 
 
-vqpi_0, samples_0 = dynaq(
+(v, q, pi), _ = dynaq(
     states,
     actions,
     obstacle_maze,
@@ -55,18 +58,18 @@ vqpi_0, samples_0 = dynaq(
     alpha=0.5,
     eps=0.1,
     n=0,
-    max_steps=2e3,
+    max_steps=MAX_STEPS,
 )
 
 # plot found policy
-final_policy = samples_0[-1][-1]
-mf = ModelFree(states, actions, obstacle_maze, gamma=0.95, policy=final_policy)
+policy = cast(ModelFreePolicy, pi)
+mf = ModelFree(states, actions, obstacle_maze, gamma=0.95, policy=policy)
 
 lrud = ["<", ">", "^", "v"]
-pi = vqpi_0[2].pi
+
 
 plt.figure(figsize=(6, 6))
-for s, p in zip(states, pi):
+for s, p in zip(states, policy.pi):
     marker = lrud[np.argmax(p)]
     plt.scatter(s[0], s[1], c="red", marker=marker)
 
@@ -81,7 +84,7 @@ plt.show()
 # steps per episode function of N planning steps
 
 NS = [0, 5, 50]
-SMOOTH = 30
+SMOOTH = 60
 
 model = ModelFree(states, actions, obstacle_maze, gamma=0.95)
 init_state = model.states.get_index(START_XY)
@@ -98,7 +101,7 @@ for i in range(SMOOTH):
         alpha=0.1,
         eps=0.1,
         n=0,
-        max_steps=1e4,
+        max_steps=MAX_STEPS,
     )
     vqpi_5, samples_5 = dynaq(
         states,
@@ -110,7 +113,7 @@ for i in range(SMOOTH):
         alpha=0.1,
         eps=0.1,
         n=5,
-        max_steps=1e4,
+        max_steps=MAX_STEPS,
     )
     vqpi_50, samples_50 = dynaq(
         states,
@@ -122,7 +125,7 @@ for i in range(SMOOTH):
         alpha=0.1,
         eps=0.1,
         n=50,
-        max_steps=1e4,
+        max_steps=MAX_STEPS,
     )
 
     steps_per_episode = []
