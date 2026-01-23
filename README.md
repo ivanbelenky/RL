@@ -7,7 +7,7 @@
 
 ### setup.py
 ```sh
-$ python setup.py install
+uv pip install -e .
 ```
 
 # Overview
