@@ -5,7 +5,6 @@
 
 ## Installation 
 
-### setup.py
 ```sh
 uv pip install -e .
 ```
