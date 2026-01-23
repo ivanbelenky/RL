@@ -87,7 +87,7 @@ def _set_policy(policy, eps, actions, v_hat, q_hat):
 
 def gradient_mc(
     transition: Transition,
-    random_state: Callable[[Any], Any],
+    random_state: Callable[[], Any],
     actions: Sequence[Any],
     v_hat: SGDWA,
     q_hat: SGDWA | None = None,
@@ -228,7 +228,7 @@ def _gradient_mc(
 
 def semigrad_tdn(
     transition: Transition,
-    random_state: Callable[[Any], Any],
+    random_state: Callable[[], Any],
     actions: Sequence[Any],
     v_hat: SGDWA,
     q_hat: SGDWA | None = None,
