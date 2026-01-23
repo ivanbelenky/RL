@@ -1,12 +1,12 @@
-import matplotlib.pyplot as plt
 import numpy as np
-
-from rl import IHT, gradient_mc, tiles
-from rl.approximators import LinearApproximator
+import matplotlib.pyplot as plt
 
 plt.style.use("dark_background")
 
-MAX_STEPS = 1000
+from rl import gradient_mc, IHT, tiles
+from rl.approximators import LinearApproximator
+
+
 ACTIONS = (-1, 0, 1)
 X_BOUND = [-1.2, 0.5]
 V_BOUND = [-0.07, 0.07]
@@ -68,7 +68,7 @@ if __name__ == "__main__":
         state_0=(0, 0),
         action_0=0,
         n_episodes=500,
-        max_steps=MAX_STEPS,
+        max_steps=1e4,
         alpha=0.1 / 8,
         eps=0.1,
         optimize=True,

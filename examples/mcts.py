@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 
-from rl import mcts
-
 plt.style.use("dark_background")
+
+from rl import mcts
 
 GRID_HEIGHT, GRID_WIDTH = 6, 9
 START_XY, GOAL_XY = (0, 3), (8, 5)

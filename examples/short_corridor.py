@@ -1,13 +1,14 @@
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
+
+plt.style.use("dark_background")
+
 from tqdm import tqdm
 
 from rl import reinforce_mc
-from rl.approximators import LinearApproximator, ModelFreeTL
+from rl.approximators import ModelFreeTL, LinearApproximator
 
 actions = ["left", "right"]
-
-plt.style.use("dark_background")
 
 
 def short_corridor(state, action):

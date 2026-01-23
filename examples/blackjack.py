@@ -6,8 +6,6 @@ VALUES = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 SUITS = ["♠", "♥", "♦", "♣"]
 CARDS = [(value, suit) for value in VALUES for suit in SUITS]
 
-N_EPISODES = 1000
-
 states = [(i, False, dealer_showing) for i in range(4, 21) for dealer_showing in VALUES]
 
 states += [
@@ -90,6 +88,6 @@ vqpi, samples = alpha_mc(
     black_jack_transition,
     gamma=0.9,
     use_N=True,
-    n_episodes=N_EPISODES,
+    n_episodes=1e4,
     first_visit=False,
 )
