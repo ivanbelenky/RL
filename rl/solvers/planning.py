@@ -83,6 +83,7 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps, sample_s
     model_sas = np.zeros((S, A), dtype=int)
     model_sar = np.zeros((S, A), dtype=float)
     times_sa = np.zeros((S, A), dtype=int)
+    visited_sa = set()
 
     samples = []
     current_t = 0
@@ -103,10 +104,14 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps, sample_s
             model_sas[s, a] = s_
             model_sar[s, a] = r
 
+            visited_sa.add((s, a))
+
             current_t += 1
 
             for _ in range(n):
-                rs, ra = MF.random_sa()
+                if len(visited_sa) == 0:
+                    break
+                rs, ra = list(visited_sa)[np.random.randint(len(visited_sa))]
                 s_m = model_sas[rs, ra]  # model next state
                 r_ = model_sar[rs, ra]
                 R = r_
@@ -114,6 +119,7 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps, sample_s
                     tau = current_t - times_sa[rs, ra]
                     R = R + κ * np.sqrt(tau)
                 q[rs, ra] = q[rs, ra] + α * (R + γ * np.max(q[s_m]) - q[rs, ra])
+                π.update_policy(q, rs)
 
             π.update_policy(q, s_)
             s = s_  # current state equal next state
