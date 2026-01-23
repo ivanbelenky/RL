@@ -84,7 +84,7 @@ plt.show()
 # steps per episode function of N planning steps
 
 NS = [0, 5, 50]
-SMOOTH = 60
+SMOOTH = 30
 
 model = ModelFree(states, actions, obstacle_maze, gamma=0.95)
 init_state = model.states.get_index(START_XY)
