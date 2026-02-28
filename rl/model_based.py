@@ -243,7 +243,7 @@ class MDP[S: int, A: int]:
     def optimize_policy(
         self,
         method: Literal["policy_iteration", "value_iteration"] = "policy_iteration",
-    ) -> MarkovPolicy:
+    ) -> VQPi:
         """
         Optimal policy is the policy that maximizes the expected
         discounted return. It is the policy that maximizes the

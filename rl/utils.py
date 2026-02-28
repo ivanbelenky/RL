@@ -83,8 +83,9 @@ class _TabularValues:
         self.v = values
         if not isinstance(idx, _TabularIndexer):
             self.idx: _TabularIndexer = _TabularIndexer.from_indexable(idx)
+        else:
+            self.idx: _TabularIndexer = idx
 
-        self.idx: _TabularIndexer = idx
         self.idx_val = {k: v for k, v in zip(self.idx.index.keys(), values)}
 
     def values(self):
