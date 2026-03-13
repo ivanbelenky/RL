@@ -56,9 +56,8 @@ def action_map(state):
 if __name__ == "__main__":
     s = START_XY
     end = False
-    tree = None
     while not end:
-        action, _ = mcts(s, 0.0, 500, obstacle_maze, action_map, 25, eps=1)
+        action, tree = mcts(s, 0.0, 500, obstacle_maze, action_map, 25, eps=1)
         print(s, action)
         (s, _), end = obstacle_maze(s, action)
 

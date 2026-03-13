@@ -12,6 +12,7 @@ from rl.solvers.model_free import (
 from rl.utils import (
     MAX_ITER,
     MAX_STEPS,
+    Action,
     PQueue,
     Samples,
     Transition,
@@ -387,8 +388,16 @@ def _backup(v_leaf, delta):
 
 
 def mcts(
-    s0, Cp, budget, transition, action_map, max_steps, tree=None, eps=1, verbose=True
-):
+    s0,
+    Cp,
+    budget,
+    transition,
+    action_map,
+    max_steps,
+    tree=None,
+    eps=1,
+    verbose=True,
+) -> tuple[Action, UCTree]:
     """
     Effectively implementing the UCT search algorithm
     """
