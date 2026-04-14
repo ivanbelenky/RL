@@ -234,7 +234,7 @@ def _visit_monte_carlo(
             (idx, s_v, s_q, sample) = get_sample(MF, v, q, π, n_episode, optimize)
             samples.append(Sample((idx, s_v, s_q, sample)))
 
-    return v, q, Samples(samples)
+    return Vpi(v, MF.states), Qpi(q, MF.stateaction), Samples(samples)
 
 
 def off_policy_mc(
@@ -409,7 +409,7 @@ def _off_policy_monte_carlo(
             (idx, s_v, s_q, sample) = get_sample(MF, v, q, π, n_episode, optimize)
             samples.append(Sample((idx, s_v, s_q, sample)))
 
-    return v, q, Samples(samples)
+    return Vpi(v, MF.states), Qpi(q, MF.stateaction), Samples(samples)
 
 
 def tdn(
