@@ -1,7 +1,7 @@
 import copy
 from abc import ABC, abstractmethod
 from time import perf_counter
-from typing import Any, Callable, List, Optional, Sequence, Union, cast, override
+from typing import Any, Callable, Optional, Sequence, cast, override
 
 import numpy as np
 
@@ -52,7 +52,7 @@ class Approximator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update(self, *args, **kwargs) -> Union[None, np.ndarray]:
+    def update(self, *args, **kwargs) -> None | np.ndarray:
         """Update the approximator"""
         raise NotImplementedError
 
@@ -193,17 +193,17 @@ class ModelFreeTL:
         a_0: Any,
         policy: ModelFreeTLPolicy | None = None,
         max_steps: int = MAX_STEPS,
-    ) -> List[EpisodeStep]:
+    ) -> list[EpisodeStep]:
         """Generate an episode using given policy if any, otherwise
         use the one defined as the attribute"""
         policy = policy if policy else self.policy
-        episode = []
+        episode: list[EpisodeStep] = []
         end = False
         step = 0
         s_t_1, a_t_1 = s_0, a_0
         while (not end) and (step < max_steps):
             (s_t, r_t), end = self.transition(s_t_1, a_t_1)
-            episode.append((s_t_1, a_t_1, r_t))
+            episode.append(EpisodeStep((s_t_1, cast(int, a_t_1), r_t)))
             a_t = policy(s_t)
             s_t_1, a_t_1 = s_t, a_t
             step += 1
