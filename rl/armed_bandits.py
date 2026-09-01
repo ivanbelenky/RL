@@ -2,8 +2,6 @@
 RL - Copyright © 2023 Iván Belenky @Leculette
 """
 
-from typing import List
-
 import numpy as np
 import numpy.random as rnd
 
@@ -16,7 +14,7 @@ NGAMES = 1
 NSTEPS = 1000
 
 
-class EpsilonGreedyBanditPolicy(Policy):
+class EpsilonGreedyBanditPolicy(Policy[int]):
     def __init__(self, k: int = 10, epsilon: float = 0.1, offset: float = 0.0):
         self.k = k
         self.eps = epsilon
@@ -24,7 +22,7 @@ class EpsilonGreedyBanditPolicy(Policy):
         self.q_values = np.zeros(k) + self.offset
         self.N = np.zeros(k)
 
-    def __call__(self, state: int) -> int:
+    def __call__(self, state: int = 0) -> int:
         if rnd.random() < self.eps:
             return rnd.randint(self.k)
         return np.argmax(self.q_values)  # type: ignore
@@ -40,7 +38,7 @@ class EpsilonGreedyBanditPolicy(Policy):
         self.q_values[action] = Qnew
 
 
-class UCBPolicy(Policy):
+class UCBPolicy(Policy[int]):
     def __init__(self, k: int = 10, c: float = 2.0, offset: float = 0.0):
         self.k = k
         self.c = c
@@ -49,14 +47,14 @@ class UCBPolicy(Policy):
         self.N = np.zeros(k)
         self.init_counter = 0
 
-    def __call__(self):
+    def __call__(self) -> int:
         if self.init_counter < self.k:
             action_index = self.init_counter
             self.init_counter += 1
             return action_index
 
-        return np.argmax(
-            self.q_values + self.c * np.sqrt(np.log(np.sum(self.N)) / self.N)
+        return int(
+            np.argmax(self.q_values + self.c * np.sqrt(np.log(np.sum(self.N)) / self.N))
         )
 
     def update_policy(self, action, reward):
@@ -88,7 +86,7 @@ class AlphaEpsilonGreedyBanditPolicy(EpsilonGreedyBanditPolicy):
         self.q_values[action] = Qnew
 
 
-class GradientPolicy(Policy):
+class GradientPolicy(Policy[int]):
     def __init__(self, k: int = 10, alpha: float = 0.1):
         self.k = k
         self.alpha = alpha
@@ -115,7 +113,7 @@ class MultiArmedBandit:
         k: int = 10,
         reward_generators: list[RandomRewardGenerator] = GAUSSIAN,
         n_games: int = NGAMES,
-        policy: Policy = EGREEDY,
+        policy: Policy[int] = EGREEDY,
     ):
         self.k = k
         self.reward_generators = reward_generators
@@ -137,7 +135,7 @@ class MultiArmedBandit:
         self.action_history = []
         self.reward_history = []
 
-    def evaluate_policy(self) -> List[float]:
+    def evaluate_policy(self) -> list[float]:
         for _ in range(self.N):
             self.step(self.policy())
 

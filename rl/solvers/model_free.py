@@ -2,12 +2,14 @@
 RL - Copyright © 2023 Iván Belenky @Leculette
 """
 
-from typing import Any, Literal, Sequence
+from collections.abc import Hashable
+from typing import Literal
 
 import numpy as np
 from tqdm import tqdm
 
 from rl.model_free import EpsilonSoftPolicy, ModelFree, ModelFreePolicy
+from rl.types import SizedIterable
 from rl.utils import (
     MAX_ITER,
     MAX_STEPS,
@@ -23,14 +25,19 @@ from rl.utils import (
 )
 
 
-def get_sample(
-    MF: ModelFree,
+def get_sample[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
     v: np.ndarray,
     q: np.ndarray,
     π: ModelFreePolicy,
     n_episode: int,
     optimize: bool,
-) -> tuple[int, Vpi, Qpi, ModelFreePolicy | None]:
+) -> tuple[
+    int,
+    Vpi[StateT],
+    Qpi[tuple[StateT, ActionT]],
+    ModelFreePolicy | None,
+]:
     _idx = n_episode
     _v, _q = Vpi(v.copy(), MF.states), Qpi(q.copy(), MF.stateaction)
     _pi = None
@@ -40,19 +47,23 @@ def get_sample(
     return (_idx, _v, _q, _pi)
 
 
-def _set_s0_a0(MF: ModelFree, s: int | None, a: int | None) -> tuple[int, int]:
-    s_0, a_0 = MF.random_sa()
-    s_0 = s_0 if not s else s
-    a_0 = a_0 if not a else a
+def _set_s0_a0[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
+    s: StateT | None,
+    a: ActionT | None,
+) -> tuple[StateT, ActionT]:
+    s_0, a_0 = MF.random_sa(value=True)
+    s_0 = s_0 if s is None else s
+    a_0 = a_0 if a is None else a
     return s_0, a_0
 
 
-def _set_policy(
+def _set_policy[StateT, ActionT](
     policy: ModelFreePolicy | None,
     eps: int | float | None,
-    actions: Sequence[Any],
-    states: Sequence[Any],
-):
+    actions: SizedIterable[ActionT],
+    states: SizedIterable[StateT],
+) -> ModelFreePolicy:
     if not policy and eps:
         _typecheck_all(constants=[eps])
         _check_ranges(values=[eps], ranges=[(0, 1)])
@@ -63,10 +74,10 @@ def _set_policy(
     return policy
 
 
-def alpha_mc(
-    states: Sequence[Any],
-    actions: Sequence[Any],
-    transition: Transition,
+def alpha_mc[StateT: Hashable, ActionT: Hashable](
+    states: SizedIterable[StateT],
+    actions: SizedIterable[ActionT],
+    transition: Transition[StateT, ActionT],
     gamma: float = 0.9,
     alpha: float = 0.05,
     use_N: bool = False,
@@ -78,7 +89,10 @@ def alpha_mc(
     optimize: bool = False,
     policy: ModelFreePolicy | None = None,
     eps: float | None = None,
-) -> tuple[VQPi, Samples]:
+) -> tuple[
+    VQPi[StateT, ActionT, ModelFreePolicy],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     """α-MC state and action-value function estimation, policy optimization
 
     Alpha weighted Monte Carlo state and action-value function estimation, policy
@@ -159,7 +173,7 @@ def alpha_mc(
         sample_step,
     )
 
-    return VQPi((v, q, model.policy)), final_samples
+    return VQPi(v, q, model.policy), final_samples
 
 
 def _mc_step(v, q, t, s_t, a_t, s, a, n_s, n_sa, G, first_visit):
@@ -188,8 +202,8 @@ def _mc_step_α(v, q, t, s_t, a_t, s, a, α, G, first_visit):
     return False
 
 
-def _visit_monte_carlo(
-    MF: ModelFree,
+def _visit_monte_carlo[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
     first_visit: bool,
     exploring_starts: bool,
     use_N: bool,
@@ -198,12 +212,16 @@ def _visit_monte_carlo(
     max_steps: int,
     optimize: bool,
     sample_step: int,
-) -> tuple[Vpi, Qpi, Samples]:
+) -> tuple[
+    Vpi[StateT],
+    Qpi[tuple[StateT, ActionT]],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     π = MF.policy
     γ = MF.gamma
     α = alpha
 
-    samples: list[Sample] = []
+    samples: list[Sample[StateT, ActionT, ModelFreePolicy]] = []
 
     v, q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
     if use_N:
@@ -232,15 +250,15 @@ def _visit_monte_carlo(
 
         if sample_step and n_episode % sample_step == 0:
             (idx, s_v, s_q, sample) = get_sample(MF, v, q, π, n_episode, optimize)
-            samples.append(Sample((idx, s_v, s_q, sample)))
+            samples.append(Sample(idx, s_v, s_q, sample))
 
     return Vpi(v, MF.states), Qpi(q, MF.stateaction), Samples(samples)
 
 
-def off_policy_mc(
-    states: Sequence[Any],
-    actions: Sequence[Any],
-    transition: Transition,
+def off_policy_mc[StateT: Hashable, ActionT: Hashable](
+    states: SizedIterable[StateT],
+    actions: SizedIterable[ActionT],
+    transition: Transition[StateT, ActionT],
     gamma: float = 0.9,
     first_visit: bool = True,
     ordinary: bool = False,
@@ -251,7 +269,10 @@ def off_policy_mc(
     policy: ModelFreePolicy | None = None,
     eps: float | None = None,
     b: ModelFreePolicy | None = None,
-) -> tuple[VQPi, Samples]:
+) -> tuple[
+    VQPi[StateT, ActionT, ModelFreePolicy],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     """Off-policy Monte Carlo state and action value function estimation, policy
 
     Off policy Monte Carlo method for estimating state and action-value functtions
@@ -331,7 +352,7 @@ def off_policy_mc(
         sample_step,
     )
 
-    return VQPi((v, q, policy)), final_samples
+    return VQPi(v, q, policy), final_samples
 
 
 def _mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q, first_visit, ordinary):
@@ -359,8 +380,8 @@ def _mc_step_off(q, v, t, s_t, a_t, s, a, G, w, c, c_q, first_visit, ordinary):
     return False
 
 
-def _off_policy_monte_carlo(
-    MF: ModelFree,
+def _off_policy_monte_carlo[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
     off_policy: ModelFreePolicy,
     n_episodes: int,
     max_steps: int,
@@ -368,12 +389,16 @@ def _off_policy_monte_carlo(
     ordinary: bool,
     optimize: bool,
     sample_step: int,
-) -> tuple[Vpi, Qpi, Samples]:
+) -> tuple[
+    Vpi[StateT],
+    Qpi[tuple[StateT, ActionT]],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     γ = MF.gamma
     b = off_policy
     π = MF.policy
 
-    samples: Samples = Samples([])
+    samples = Samples[StateT, ActionT, ModelFreePolicy]()
 
     v, q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
     c, c_q = np.zeros(MF.states.N), np.zeros((MF.states.N, MF.actions.N))
@@ -407,17 +432,17 @@ def _off_policy_monte_carlo(
 
         if sample_step and n_episode % sample_step == 0:
             (idx, s_v, s_q, sample) = get_sample(MF, v, q, π, n_episode, optimize)
-            samples.append(Sample((idx, s_v, s_q, sample)))
+            samples.append(Sample(idx, s_v, s_q, sample))
 
     return Vpi(v, MF.states), Qpi(q, MF.stateaction), Samples(samples)
 
 
-def tdn(
-    states: Sequence[Any],
-    actions: Sequence[Any],
-    transition: Transition,
-    state_0: Any = None,
-    action_0: Any = None,
+def tdn[StateT: Hashable, ActionT: Hashable](
+    states: SizedIterable[StateT],
+    actions: SizedIterable[ActionT],
+    transition: Transition[StateT, ActionT],
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     gamma: float = 0.9,
     n: int = 1,
     alpha: float = 0.05,
@@ -428,7 +453,10 @@ def tdn(
     method: str = "sarsa",
     samples: int = 1000,
     max_steps: int = MAX_STEPS,
-) -> tuple[VQPi, Samples]:
+) -> tuple[
+    VQPi[StateT, ActionT, ModelFreePolicy],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     """N-temporal differences algorithm.
 
     Temporal differences algorithm for estimating the value function of a
@@ -534,7 +562,7 @@ def tdn(
         sample_step,
     )
 
-    return VQPi((v, q, policy)), samples
+    return VQPi(v, q, policy), samples
 
 
 def _td_step(
@@ -620,10 +648,10 @@ STEP_MAP = {
 }
 
 
-def _tdn_onoff(
-    MF: ModelFree,
-    s_0: int,
-    a_0: int,
+def _tdn_onoff[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
+    s_0: StateT | None,
+    a_0: ActionT | None,
     n: int,
     alpha: float,
     n_episodes: int,
@@ -709,10 +737,10 @@ def _td_dq_step(
     q1[q_key] = q1[q_key] + α * (G_q - q1[q_key])
 
 
-def _double_q(
-    MF: ModelFree,
-    s_0: int,
-    a_0: int,
+def _double_q[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
+    s_0: StateT | None,
+    a_0: ActionT | None,
     n: int,
     alpha: float,
     n_episodes: int,
@@ -758,10 +786,10 @@ def _double_q(
     return v, q, samples
 
 
-def _tdn_on(
-    MF: ModelFree,
-    s_0: int,
-    a_0: int,
+def _tdn_on[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
+    s_0: StateT | None,
+    a_0: ActionT | None,
     n: int,
     alpha: float,
     n_episodes: int,
@@ -838,12 +866,12 @@ METHOD_MAP = {
 METHODS = METHOD_MAP.keys()
 
 
-def n_tree_backup(
-    states: Sequence[Any],
-    actions: Sequence[Any],
-    transition: Transition,
-    state_0: Any = None,
-    action_0: Any = None,
+def n_tree_backup[StateT: Hashable, ActionT: Hashable](
+    states: SizedIterable[StateT],
+    actions: SizedIterable[ActionT],
+    transition: Transition[StateT, ActionT],
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     gamma: float = 1.0,
     n: int = 1,
     alpha: float = 0.05,
@@ -853,7 +881,10 @@ def n_tree_backup(
     optimize: bool = False,
     samples: int = 1000,
     max_steps: int = MAX_STEPS,
-) -> tuple[VQPi, Samples]:
+) -> tuple[
+    VQPi[StateT, ActionT, ModelFreePolicy],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     """N-temporal differences algorithm.
 
     Temporal differences algorithm for estimating the value function of a
@@ -916,7 +947,7 @@ def n_tree_backup(
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
 
-    v, q, samples = _n_tree_backup(
+    v, q, final_samples = _n_tree_backup(
         model,
         state_0,
         action_0,
@@ -928,20 +959,24 @@ def n_tree_backup(
         sample_step,
     )
 
-    return VQPi((v, q, policy)), samples
+    return VQPi(v, q, policy), final_samples
 
 
-def _n_tree_backup(
-    MF,
-    s_0,
-    a_0,
-    n,
-    alpha,
-    n_episodes,
-    max_steps,
-    optimize,
-    sample_step,
-):
+def _n_tree_backup[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
+    s_0: StateT | None,
+    a_0: ActionT | None,
+    n: int,
+    alpha: float,
+    n_episodes: int,
+    max_steps: int,
+    optimize: bool,
+    sample_step: int,
+) -> tuple[
+    Vpi[StateT],
+    Qpi[tuple[StateT, ActionT]],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     π, α, γ = MF.policy, alpha, MF.gamma
 
     v, q = MF.init_vq()
@@ -972,16 +1007,16 @@ def _n_tree_backup(
                 if t + 1 >= T:
                     G = R[-1]
                 else:
-                    G = R[t] + γ * np.dot(π.pi[s[t]], q[s[t]])
+                    G = R[t] + γ * np.dot(π.pi[S[t]], q[S[t]])
 
                 for k in range(min(t, T - 1), tau):
                     G = (
                         R[k - 1]
-                        + γ * np.dot(π.pi[s[k - 1]], q[s[k - 1]])
-                        + γ * π.pi[s[k - 1], A[k - 1]] * (G - q[s[k - 1], A[k - 1]])
+                        + γ * np.dot(π.pi[S[k - 1]], q[S[k - 1]])
+                        + γ * π.pi[S[k - 1], A[k - 1]] * (G - q[S[k - 1], A[k - 1]])
                     )
 
-                q[S[tau], A[tau]] = q[S[tau], A[tau]] + α[G - q[S[tau], A[tau]]]
+                q[S[tau], A[tau]] += α * (G - q[S[tau], A[tau]])
 
                 if optimize:
                     π.update_policy(q, S[tau])
@@ -990,6 +1025,7 @@ def _n_tree_backup(
                 break
 
         if n_episode % sample_step == 0:
-            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+            sample = get_sample(MF, v, q, π, n_episode, optimize)
+            samples.append(Sample(*sample))
 
-    return v, q, samples
+    return Vpi(v, MF.states), Qpi(q, MF.stateaction), Samples(samples)

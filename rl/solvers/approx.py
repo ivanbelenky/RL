@@ -1,5 +1,6 @@
 from copy import deepcopy
-from typing import Any, Callable, List, Never, Sequence
+from collections.abc import Callable, Hashable, Sequence
+from typing import Never
 
 import numpy as np
 from numpy.linalg import norm as lnorm
@@ -18,7 +19,6 @@ from rl.utils import (
     MAX_ITER,
     MAX_STEPS,
     TOL,
-    Samples,
     Transition,
     _check_ranges,
     _get_sample_step,
@@ -26,14 +26,34 @@ from rl.utils import (
 )
 
 
-class AVQPi:
-    def __init__(self, v: Approximator, q: Approximator, pi: ModelFreeTLPolicy):
+class AVQPi[StateT, ActionT]:
+    def __init__(
+        self,
+        v: Approximator[StateT],
+        q: Approximator[tuple[StateT, ActionT]],
+        pi: ModelFreeTLPolicy[StateT, ActionT],
+    ):
         self.v_hat = v
         self.q = q
         self.pi = pi
 
 
-def get_sample(v_hat, q_hat, π, n_episode, optimize):
+type ApproxSample[StateT, ActionT] = tuple[
+    int,
+    Approximator[StateT],
+    Approximator[tuple[StateT, ActionT]] | None,
+    ModelFreeTLPolicy[StateT, ActionT] | None,
+]
+type ApproxSamples[StateT, ActionT] = list[ApproxSample[StateT, ActionT]]
+
+
+def get_sample[StateT, ActionT](
+    v_hat: Approximator[StateT],
+    q_hat: Approximator[tuple[StateT, ActionT]],
+    π: ModelFreeTLPolicy[StateT, ActionT],
+    n_episode: int,
+    optimize: bool,
+) -> ApproxSample[StateT, ActionT]:
     _idx = n_episode
     _v = v_hat.copy()
     _q = None
@@ -44,19 +64,25 @@ def get_sample(v_hat, q_hat, π, n_episode, optimize):
     return (_idx, _v, _q, _pi)
 
 
-def _set_s0_a0(MFS, s, a):
+def _set_s0_a0[StateT, ActionT](
+    MFS: ModelFreeTL[StateT, ActionT],
+    s: StateT | None,
+    a: ActionT | None,
+) -> tuple[StateT, ActionT]:
     s_0, a_0 = MFS.random_sa()
-    s_0 = s_0 if not s else s
-    a_0 = a_0 if not a else a
+    s_0 = s_0 if s is None else s
+    a_0 = a_0 if a is None else a
     return s_0, a_0
 
 
-def onehot_q_hat(v_hat, actions):
+def onehot_q_hat[StateT, ActionT: Hashable](
+    v_hat: SGDWA[StateT], actions: Sequence[ActionT]
+) -> SGDWA[tuple[StateT, ActionT]]:
     """V(s) function approximator to Q(s,a) function approximator"""
     A = len(actions)
     onehot_actions = {a: np.zeros(A - 1) for a in actions}
-    for a in range(A - 1):
-        onehot_actions[a][a] = 1
+    for action_idx, action in enumerate(actions[:-1]):
+        onehot_actions[action][action_idx] = 1
 
     def new_basis(sa):
         s, a = sa
@@ -68,12 +94,20 @@ def onehot_q_hat(v_hat, actions):
     fs = v_hat.fs + A - 1
     basis = new_basis
 
-    q_hat = v_hat.__class__(fs, basis)
+    q_hat = SGDWA[tuple[StateT, ActionT]](fs, basis)
     return q_hat
 
 
-def _set_policy(policy, eps, actions, v_hat, q_hat):
+def _set_policy[StateT, ActionT: Hashable](
+    policy: ModelFreeTLPolicy[StateT, ActionT] | None,
+    eps: float | None,
+    actions: Sequence[ActionT] | None,
+    v_hat: SGDWA[StateT],
+    q_hat: SGDWA[tuple[StateT, ActionT]] | None,
+) -> ModelFreeTLPolicy[StateT, ActionT]:
     if not policy:
+        if actions is None:
+            raise ValueError("actions are required when policy is not provided")
         if not q_hat:
             q_hat = onehot_q_hat(v_hat, actions)
         if eps:
@@ -85,24 +119,24 @@ def _set_policy(policy, eps, actions, v_hat, q_hat):
     return policy
 
 
-def gradient_mc(
-    transition: Transition,
-    random_state: Callable[[], Any],
-    actions: Sequence[Any],
-    v_hat: SGDWA,
-    q_hat: SGDWA | None = None,
-    state_0: Any = None,
-    action_0: Any = None,
+def gradient_mc[StateT, ActionT: Hashable](
+    transition: Transition[StateT, ActionT],
+    random_state: Callable[[], StateT],
+    actions: Sequence[ActionT],
+    v_hat: SGDWA[StateT],
+    q_hat: SGDWA[tuple[StateT, ActionT]] | None = None,
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     alpha: float = 0.05,
     gamma: float = 1.0,
     n_episodes: int = MAX_ITER,
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy | None = None,
+    policy: ModelFreeTLPolicy[StateT, ActionT] | None = None,
     tol: float = TOL,
     eps: float | None = None,
-) -> tuple[AVQPi, Samples]:
+) -> tuple[AVQPi[StateT, ActionT], ApproxSamples[StateT, ActionT]]:
     """Gradient α-MC algorithm for estimating, and optimizing policies
 
     gradient_mc uses the gradient of VE to estimate the value of
@@ -226,14 +260,14 @@ def _gradient_mc(
     return v_hat, q_hat, samples
 
 
-def semigrad_tdn(
-    transition: Transition,
-    random_state: Callable[[], Any],
-    actions: Sequence[Any],
-    v_hat: SGDWA,
-    q_hat: SGDWA | None = None,
-    state_0: Any = None,
-    action_0: Any = None,
+def semigrad_tdn[StateT, ActionT: Hashable](
+    transition: Transition[StateT, ActionT],
+    random_state: Callable[[], StateT],
+    actions: Sequence[ActionT],
+    v_hat: SGDWA[StateT],
+    q_hat: SGDWA[tuple[StateT, ActionT]] | None = None,
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     alpha: float = 0.05,
     n: int = 1,
     gamma: float = 1.0,
@@ -241,10 +275,10 @@ def semigrad_tdn(
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy | None = None,
+    policy: ModelFreeTLPolicy[StateT, ActionT] | None = None,
     tol: float = TOL,
     eps: float | None = None,
-) -> tuple[AVQPi, Samples]:
+) -> tuple[AVQPi[StateT, ActionT], ApproxSamples[StateT, ActionT]]:
     """Semi-Gradient n-step Temporal Difference
 
     Solver for the n-step temporal difference algorithm. The algorithm is
@@ -404,24 +438,24 @@ def _semigrad_tdn(
 
 
 # TODO: policy setting and optimize
-def lstd(
-    transition: Transition,
-    random_state: Callable[[Any], Any],
-    actions: Sequence[Any],
-    v_hat: SGDWA,
-    q_hat: SGDWA | None = None,
-    state_0: Any = None,
-    action_0: Any = None,
+def lstd[StateT, ActionT: Hashable](
+    transition: Transition[StateT, ActionT],
+    random_state: Callable[[], StateT],
+    actions: Sequence[ActionT],
+    v_hat: SGDWA[StateT],
+    q_hat: SGDWA[tuple[StateT, ActionT]] | None = None,
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     alpha: float = 0.05,
     gamma: float = 1.0,
     n_episodes: int = MAX_ITER,
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy | None = None,
+    policy: ModelFreeTLPolicy[StateT, ActionT] | None = None,
     tol: float = TOL,
     eps: float | None = None,
-) -> Never:  # tuple[AVQPi, Samples]:
+) -> Never:
     """Least squares n-step temporal differnece
 
     Parameters
@@ -508,24 +542,24 @@ def _lstd(MF, s_0, a_0, alpha, n_episodes, max_steps, tol, optimize, sample_step
     raise NotImplementedError
 
 
-def diff_semigradn(
-    transition: Transition,
-    random_state: Callable[[Any], Any],
-    v_hat: SGDWA,
-    q_hat: SGDWA | None = None,
-    actions: Sequence[Any] | None = None,
-    state_0: Any = None,
-    action_0: Any = None,
+def diff_semigradn[StateT, ActionT: Hashable](
+    transition: Transition[StateT, ActionT],
+    random_state: Callable[[], StateT],
+    v_hat: SGDWA[StateT],
+    q_hat: SGDWA[tuple[StateT, ActionT]] | None = None,
+    actions: Sequence[ActionT] | None = None,
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     alpha: float = 0.1,
     beta: float = 0.1,
     n: int = 1,
     T: int = int(1e5),
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy | None = None,
+    policy: ModelFreeTLPolicy[StateT, ActionT] | None = None,
     tol: float = TOL,
     eps: float | None = None,
-) -> tuple[AVQPi, Samples]:
+) -> tuple[AVQPi[StateT, ActionT], ApproxSamples[StateT, ActionT]]:
     """Differential semi gradient n-step Sarsa for estimation and control.
 
     The average reward setting is one of that comes to solve many problems
@@ -671,14 +705,14 @@ def _diff_semigrad(MFS, v_hat, s_0, a_0, alpha, beta, n, T, tol, optimize, sampl
     return v_hat, q_hat, samples
 
 
-def semigrad_td_lambda(
-    transition: Transition,
-    random_state: Callable,
-    v_hat: SGDWA,
-    q_hat: SGDWA | None = None,
-    actions: Sequence[Any] | None = None,
-    state_0: Any = None,
-    action_0: Any = None,
+def semigrad_td_lambda[StateT, ActionT: Hashable](
+    transition: Transition[StateT, ActionT],
+    random_state: Callable[[], StateT],
+    v_hat: SGDWA[StateT],
+    q_hat: SGDWA[tuple[StateT, ActionT]] | None = None,
+    actions: Sequence[ActionT] | None = None,
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     alpha: float = 0.1,
     lambdaa: float = 0.1,
     gamma: float = 0.9,
@@ -686,10 +720,10 @@ def semigrad_td_lambda(
     max_steps: int = int(1e3),
     samples: int = 1000,
     optimize: bool = False,
-    policy: ModelFreeTLPolicy | None = None,
+    policy: ModelFreeTLPolicy[StateT, ActionT] | None = None,
     tol: float = TOL,
     eps: float | None = None,
-) -> tuple[AVQPi, Samples]:
+) -> tuple[AVQPi[StateT, ActionT], ApproxSamples[StateT, ActionT]]:
     """Semi-gradient TD(λ).
 
     Eligibility traces semi gradient TD(λ). This algorithms extends more
@@ -841,21 +875,24 @@ def _td_lambda(
     return v_hat, q_hat, samples
 
 
-def reinforce_mc(
-    transition: Transition,
-    random_state: Callable,
-    pi_hat: DifferentiableApproximator,
-    actions: Sequence[Any],
-    state_0: Any = None,
-    action_0: Any = None,
+def reinforce_mc[StateT, ActionT: Hashable](
+    transition: Transition[StateT, ActionT],
+    random_state: Callable[[], StateT],
+    pi_hat: DifferentiableApproximator[tuple[StateT, ActionT]],
+    actions: Sequence[ActionT],
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     alpha: float = 0.1,
     gamma: float = 0.9,
     n_episodes: int = MAX_ITER,
     max_steps: int = MAX_STEPS,
     samples: int = 1000,
-    policy: REINFORCEPolicy | None = None,
+    policy: REINFORCEPolicy[StateT, ActionT] | None = None,
     tol: float = TOL,
-) -> tuple[REINFORCEPolicy, List[REINFORCEPolicy]]:
+) -> tuple[
+    REINFORCEPolicy[StateT, ActionT],
+    list[REINFORCEPolicy[StateT, ActionT]],
+]:
     """MC Policy-Gradient control algorithm
 
     This algorithm must be used with differentiable policies. Regardless of the

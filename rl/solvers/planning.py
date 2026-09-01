@@ -1,4 +1,5 @@
-from typing import Any, Sequence
+from collections.abc import Callable, Hashable, Sequence
+from typing import cast
 
 import numpy as np
 from tqdm import tqdm
@@ -9,27 +10,30 @@ from rl.solvers.model_free import (
     _set_s0_a0,
     get_sample,
 )
+from rl.types import SizedIterable
 from rl.utils import (
     MAX_ITER,
     MAX_STEPS,
-    Action,
     PQueue,
+    Qpi,
+    Sample,
     Samples,
     Transition,
     UCTNode,
     UCTree,
+    Vpi,
     VQPi,
     _get_sample_step,
     _typecheck_all,
 )
 
 
-def dynaq(
-    states: Sequence[Any],
-    actions: Sequence[Any],
-    transition: Transition,
-    state_0: Any = None,
-    action_0: Any = None,
+def dynaq[StateT: Hashable, ActionT: Hashable](
+    states: SizedIterable[StateT],
+    actions: SizedIterable[ActionT],
+    transition: Transition[StateT, ActionT],
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     gamma: float = 1.0,
     kappa: float = 0.01,
     n: int = 1,
@@ -40,7 +44,10 @@ def dynaq(
     eps: float | None = None,
     samples: int = 1000,
     max_steps: int = MAX_STEPS,
-) -> tuple[VQPi, Samples]:
+) -> tuple[
+    VQPi[StateT, ActionT, ModelFreePolicy],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     """
     TODO: docs
     """
@@ -59,7 +66,7 @@ def dynaq(
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
-    v, q, samples = _dyna_q(
+    v, q, final_samples = _dyna_q(
         model,
         state_0,
         action_0,
@@ -72,10 +79,25 @@ def dynaq(
         sample_step,
     )
 
-    return VQPi((v, q, policy)), samples
+    return VQPi(v, q, policy), final_samples
 
 
-def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps, sample_step):
+def _dyna_q[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
+    s_0: StateT | None,
+    a_0: ActionT | None,
+    n: int,
+    alpha: float,
+    kappa: float,
+    plus: bool,
+    n_episodes: int,
+    max_steps: int,
+    sample_step: int,
+) -> tuple[
+    Vpi[StateT],
+    Qpi[tuple[StateT, ActionT]],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     π, α, γ, κ = MF.policy, alpha, MF.gamma, kappa
 
     v, q = MF.init_vq()
@@ -128,17 +150,17 @@ def _dyna_q(MF, s_0, a_0, n, alpha, kappa, plus, n_episodes, max_steps, sample_s
                 break
 
         if n_episode % sample_step == 0:
-            samples.append(get_sample(MF, v, q, π, n_episode, True))
+            samples.append(Sample(*get_sample(MF, v, q, π, n_episode, True)))
 
-    return v, q, samples
+    return Vpi(v, MF.states), Qpi(q, MF.stateaction), Samples(samples)
 
 
-def priosweep(
-    states: Sequence[Any],
-    actions: Sequence[Any],
-    transition: Transition,
-    state_0: Any = None,
-    action_0: Any = None,
+def priosweep[StateT: Hashable, ActionT: Hashable](
+    states: SizedIterable[StateT],
+    actions: SizedIterable[ActionT],
+    transition: Transition[StateT, ActionT],
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     gamma: float = 1.0,
     theta: float = 0.01,
     n: int = 1,
@@ -149,7 +171,10 @@ def priosweep(
     eps: float | None = None,
     samples: int = 1000,
     max_steps: int = MAX_STEPS,
-) -> tuple[VQPi, Samples]:
+) -> tuple[
+    VQPi[StateT, ActionT, ModelFreePolicy],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     """
     TODO: docs
     """
@@ -168,7 +193,7 @@ def priosweep(
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
-    v, q, samples = _priosweep(
+    v, q, final_samples = _priosweep(
         model,
         state_0,
         action_0,
@@ -180,14 +205,28 @@ def priosweep(
         sample_step,
     )
 
-    return VQPi((v, q, policy)), samples
+    return VQPi(v, q, policy), final_samples
 
 
-def _priosweep(MF, s_0, a_0, n, alpha, theta, n_episodes, max_steps, sample_step):
+def _priosweep[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
+    s_0: StateT | None,
+    a_0: ActionT | None,
+    n: int,
+    alpha: float,
+    theta: float,
+    n_episodes: int,
+    max_steps: int,
+    sample_step: int,
+) -> tuple[
+    Vpi[StateT],
+    Qpi[tuple[StateT, ActionT]],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     π, α, γ = MF.policy, alpha, MF.gamma
     v, q = MF.init_vq()
 
-    P, Pq, θ = 0, PQueue([]), theta
+    P, Pq, θ = 0, PQueue[tuple[int, int]]([]), theta
 
     S, A = MF.states.N, MF.actions.N
     model_sas = np.zeros((S, A), dtype=int)
@@ -239,17 +278,17 @@ def _priosweep(MF, s_0, a_0, n, alpha, theta, n_episodes, max_steps, sample_step
                 break
 
         if n_episode % sample_step == 0:
-            samples.append(get_sample(MF, v, q, π, n_episode, True))
+            samples.append(Sample(*get_sample(MF, v, q, π, n_episode, True)))
 
-    return v, q, samples
+    return Vpi(v, MF.states), Qpi(q, MF.stateaction), Samples(samples)
 
 
-def t_sampling(
-    states: Sequence[Any],
-    actions: Sequence[Any],
-    transition: Transition,
-    state_0: Any = None,
-    action_0: Any = None,
+def t_sampling[StateT: Hashable, ActionT: Hashable](
+    states: SizedIterable[StateT],
+    actions: SizedIterable[ActionT],
+    transition: Transition[StateT, ActionT],
+    state_0: StateT | None = None,
+    action_0: ActionT | None = None,
     gamma: float = 1.0,
     n_episodes: int = MAX_ITER,
     policy: ModelFreePolicy | None = None,
@@ -257,7 +296,10 @@ def t_sampling(
     samples: int = 1000,
     optimize: bool = False,
     max_steps: int = MAX_STEPS,
-) -> tuple[VQPi, Samples]:
+) -> tuple[
+    VQPi[StateT, ActionT, ModelFreePolicy],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     """
     TODO: docs
     """
@@ -276,14 +318,26 @@ def t_sampling(
     sample_step = _get_sample_step(samples, n_episodes)
 
     model = ModelFree(states, actions, transition, gamma=gamma, policy=policy)
-    v, q, samples = _t_sampling(
+    v, q, final_samples = _t_sampling(
         model, state_0, action_0, int(n_episodes), optimize, max_steps, sample_step
     )
 
-    return VQPi((v, q, policy)), samples
+    return VQPi(v, q, policy), final_samples
 
 
-def _t_sampling(MF, s_0, a_0, n_episodes, optimize, max_steps, sample_step):
+def _t_sampling[StateT: Hashable, ActionT: Hashable](
+    MF: ModelFree[StateT, ActionT],
+    s_0: StateT | None,
+    a_0: ActionT | None,
+    n_episodes: int,
+    optimize: bool,
+    max_steps: int,
+    sample_step: int,
+) -> tuple[
+    Vpi[StateT],
+    Qpi[tuple[StateT, ActionT]],
+    Samples[StateT, ActionT, ModelFreePolicy],
+]:
     π, γ = MF.policy, MF.gamma
     v, q = MF.init_vq()
 
@@ -302,17 +356,17 @@ def _t_sampling(MF, s_0, a_0, n_episodes, optimize, max_steps, sample_step):
         for _ in range(int(max_steps)):
             (s_, r), end = MF.step_transition(s, a_)  # real next state
 
-            n_sas[s, a, s_] += 1
-            model_sar[s, a, s_] = r  # assumes deterministic reward
+            n_sas[s, a_, s_] += 1
+            model_sar[s, a_, s_] = r  # assumes deterministic reward
 
             # p_sas is the probability of transitioning from s to s'
-            p_sas = n_sas[s, a] / np.sum(n_sas[s, a])
+            p_sas = n_sas[s, a_] / np.sum(n_sas[s, a_])
             next_s_mask = np.where(p_sas)[0]
             max_q = np.max(q[next_s_mask, :], axis=1)
-            r_ns = model_sar[s, a, next_s_mask]
+            r_ns = model_sar[s, a_, next_s_mask]
             p_ns = p_sas[next_s_mask]
 
-            q[s, a] = np.dot(p_ns, r_ns + γ * max_q)
+            q[s, a_] = np.dot(p_ns, r_ns + γ * max_q)
 
             π.update_policy(q, s)
             a_ = π(s_)
@@ -322,32 +376,44 @@ def _t_sampling(MF, s_0, a_0, n_episodes, optimize, max_steps, sample_step):
                 break
 
         if n_episode % sample_step == 0:
-            samples.append(get_sample(MF, v, q, π, n_episode, optimize))
+            samples.append(Sample(*get_sample(MF, v, q, π, n_episode, optimize)))
 
-    return v, q, samples
+    return Vpi(v, MF.states), Qpi(q, MF.stateaction), Samples(samples)
 
 
 def rtdp():
     raise NotImplementedError
 
 
-def _best_child(v, Cp):
-    actions = np.array(list(v.children.keys()))
+def _best_child[StateT, ActionT: Hashable](
+    v: UCTNode[StateT, ActionT], Cp: float
+) -> UCTNode[StateT, ActionT]:
+    actions = list(v.children)
     qs = np.array([v.children[a].q for a in actions])
     ns = np.array([v.children[a].n for a in actions])
     ucb = qs / ns + Cp * np.sqrt(np.log(v.n) / ns)
-    return v.children[actions[np.argmax(ucb)]]
+    return v.children[actions[int(np.argmax(ucb))]]
 
 
-def _expand(v, transition, actions):
-    a = np.random.choice(list(actions))
+def _expand[StateT, ActionT: Hashable](
+    v: UCTNode[StateT, ActionT],
+    transition: Transition[StateT, ActionT],
+    actions: Sequence[ActionT],
+) -> UCTNode[StateT, ActionT]:
+    a = actions[np.random.randint(len(actions))]
     (s_, _), end = transition(v.state, a)
     v_prime = UCTNode(s_, a, 0, 1, v, end)
     v.children[a] = v_prime
     return v_prime
 
 
-def _tree_policy(tree, Cp, transition, action_map, eps):
+def _tree_policy[StateT, ActionT: Hashable](
+    tree: UCTree[StateT, ActionT],
+    Cp: float,
+    transition: Transition[StateT, ActionT],
+    action_map: Callable[[StateT], Sequence[ActionT]],
+    eps: float,
+) -> UCTNode[StateT, ActionT]:
     v = tree.root
     while not v.is_terminal:
         actions = action_map(v.state)
@@ -356,12 +422,17 @@ def _tree_policy(tree, Cp, transition, action_map, eps):
         if not took_actions:
             return _expand(v, transition, actions)
         if unexplored and np.random.rand() < eps:
-            return _expand(v, transition, unexplored)
+            return _expand(v, transition, tuple(unexplored))
         v = _best_child(v, Cp)
     return v
 
 
-def _default_policy(v_leaf, transition, action_map, max_steps):
+def _default_policy[StateT, ActionT: Hashable](
+    v_leaf: UCTNode[StateT, ActionT],
+    transition: Transition[StateT, ActionT],
+    action_map: Callable[[StateT], Sequence[ActionT]],
+    max_steps: int,
+) -> float:
     step, r = 0, 0
     s = v_leaf.state
 
@@ -370,7 +441,7 @@ def _default_policy(v_leaf, transition, action_map, max_steps):
 
     while step < max_steps:
         actions = action_map(s)
-        a = np.random.choice(actions)
+        a = actions[np.random.randint(len(actions))]
         (s, _r), end = transition(s, a)
         r += _r
         if end:
@@ -379,7 +450,9 @@ def _default_policy(v_leaf, transition, action_map, max_steps):
     return -1
 
 
-def _backup(v_leaf, delta):
+def _backup[StateT, ActionT: Hashable](
+    v_leaf: UCTNode[StateT, ActionT], delta: float
+) -> None:
     v = v_leaf
     while v:
         v.n += 1
@@ -387,17 +460,17 @@ def _backup(v_leaf, delta):
         v = v.parent
 
 
-def mcts(
-    s0,
-    Cp,
-    budget,
-    transition,
-    action_map,
-    max_steps,
-    tree=None,
-    eps=1,
-    verbose=True,
-) -> tuple[Action, UCTree]:
+def mcts[StateT, ActionT: Hashable](
+    s0: StateT,
+    Cp: float,
+    budget: int,
+    transition: Transition[StateT, ActionT],
+    action_map: Callable[[StateT], Sequence[ActionT]],
+    max_steps: int,
+    tree: UCTree[StateT, ActionT] | None = None,
+    eps: float = 1,
+    verbose: bool = True,
+) -> tuple[ActionT, UCTree[StateT, ActionT]]:
     """
     Effectively implementing the UCT search algorithm
     """
@@ -410,4 +483,4 @@ def mcts(
         _backup(v_leaf, delta)
 
     v_best = _best_child(tree.root, 0)
-    return v_best.action, tree
+    return cast(ActionT, v_best.action), tree

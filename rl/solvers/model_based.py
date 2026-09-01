@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Hashable
+
 import numpy as np
 from numpy.linalg import norm as lnorm
 
@@ -14,7 +16,18 @@ from rl.utils import (
 )
 
 
-def get_sample(mdp, v, q, π, n_iter):
+def get_sample[StateT: Hashable, ActionT: Hashable](
+    mdp: MDP[StateT, ActionT],
+    v: np.ndarray,
+    q: np.ndarray,
+    π: MarkovPolicy,
+    n_iter: int,
+) -> tuple[
+    int,
+    Vpi[StateT],
+    Qpi[tuple[StateT, ActionT]],
+    None,
+]:
     _idx = n_iter
     # TODO: refactor, there is no states tabular index here
     # and there is not stateaction
@@ -29,23 +42,25 @@ def get_sample(mdp, v, q, π, n_iter):
 # slower to converge. But tests must be carried out to verify this claim.
 
 
-def vq_pi_iter_naive(
-    mdp: MDP,
+def vq_pi_iter_naive[StateT: Hashable, ActionT: Hashable](
+    mdp: MDP[StateT, ActionT],
     policy: MarkovPolicy,
     tol: float = TOL,
     inplace=False,
     max_iters: int = MAX_STEPS,
     samples: int = 1000,
-) -> VQPi:
+) -> VQPi[StateT, ActionT, MarkovPolicy]:
     # TODO: to be used
     _sample_step = _get_sample_step(samples, max_iters // 10)  # RULE OF THUMB
 
     v, q = _vq_pi_iter_naive(mdp, policy, tol, max_iters, inplace)
 
-    return VQPi((v, q, policy))
+    return VQPi(v, q, policy)
 
 
-def _inplace_step_pe(mdp: MDP, v_i, _, π_sa, r_sa, p_s, γ):
+def _inplace_step_pe[StateT: Hashable, ActionT: Hashable](
+    mdp: MDP[StateT, ActionT], v_i, _, π_sa, r_sa, p_s, γ
+):
     for s in range(mdp.states.N):
         v_i[s] = np.dot(π_sa[s], r_sa[:, s])
         v_i[s] += γ * np.dot(p_s[s] @ v_i, π_sa[s])
@@ -62,13 +77,13 @@ def _naive_step_pe(_, v_i, v_i_1, π_sa, r_sa, p_s, γ):
 ITER_NAIVE_STEP_MAP = {"inplace": _inplace_step_pe, "naive": _naive_step_pe}
 
 
-def _vq_pi_iter_naive[S: int, A: int](
-    mdp: MDP[S, A],
+def _vq_pi_iter_naive[StateT: Hashable, ActionT: Hashable](
+    mdp: MDP[StateT, ActionT],
     policy: MarkovPolicy,
     tol: float,
     max_iters: int,
     inplace: bool,
-) -> tuple[Vpi, Qpi]:
+) -> tuple[Vpi[StateT], Qpi[tuple[StateT, ActionT]]]:
     γ = mdp.gamma
     p_s = mdp.p_s
 
@@ -95,14 +110,14 @@ def _vq_pi_iter_naive[S: int, A: int](
     return Vpi(vπ, idx=mdp.states), Qpi(qπ, idx=mdp.stateaction)
 
 
-def policy_iteration(
-    mdp: MDP,
+def policy_iteration[StateT: Hashable, ActionT: Hashable](
+    mdp: MDP[StateT, ActionT],
     policy: MarkovPolicy,
     tol_eval: float = TOL,
     max_iters_eval: int = MAX_ITER,
     tol_opt: float = TOL,
     max_iters_opt: int = MAX_ITER,
-) -> VQPi:
+) -> VQPi[StateT, ActionT, MarkovPolicy]:
     (v_i_1, q_i_1, _) = vq_pi_iter_naive(
         mdp,
         policy,
@@ -126,11 +141,13 @@ def policy_iteration(
         n_iter += 1
         diff_norm = lnorm(v_i.v - v_i_1.v)
 
-    return VQPi((v_i, q_i, mdp.policy))
+    return VQPi(v_i, q_i, mdp.policy)
 
 
-def _inplace_step_vi(mdp, v_i, _, r_sa, p_s, γ):
-    for s in range(mdp.S):
+def _inplace_step_vi[StateT: Hashable, ActionT: Hashable](
+    mdp: MDP[StateT, ActionT], v_i, _, r_sa, p_s, γ
+):
+    for s in range(mdp.states.N):
         v_i[s] = np.max(r_sa[:, s] + γ * (p_s[s] @ v_i))
     return v_i, None
 
@@ -144,29 +161,29 @@ def _naive_step_vi(_, v_i, v_i_1, r_sa, p_s, γ):
 VALUE_ITERATION_STEP_MAP = {"inplace": _inplace_step_vi, "naive": _naive_step_vi}
 
 
-def value_iteration(
-    mdp: MDP,
+def value_iteration[StateT: Hashable, ActionT: Hashable](
+    mdp: MDP[StateT, ActionT],
     policy: MarkovPolicy,
     inplace: bool = False,
     tol: float = TOL,
     max_iters: int = MAX_ITER,
     samples: int = 1000,
-) -> VQPi:
+) -> VQPi[StateT, ActionT, MarkovPolicy]:
     # TODO: to be used
     _sample_step = _get_sample_step(samples, max_iters // 10)  # RULE OF THUMB
 
     v, q = _value_iteration(mdp, policy, tol, max_iters, inplace)
 
-    return VQPi((v, q, policy))
+    return VQPi(v, q, policy)
 
 
-def _value_iteration(
-    mdp: MDP,
+def _value_iteration[StateT: Hashable, ActionT: Hashable](
+    mdp: MDP[StateT, ActionT],
     policy: MarkovPolicy,
     tol: float,
     max_iters: int,
     inplace: bool,
-) -> tuple[Vpi, Qpi]:
+) -> tuple[Vpi[StateT], Qpi[tuple[StateT, ActionT]]]:
     policy = policy if policy else mdp.policy
 
     γ = mdp.gamma

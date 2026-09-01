@@ -17,13 +17,14 @@ from .solvers.planning import (
     t_sampling,
 )
 from .tiles import IHT, tiles
-from .utils import TransitionException
+from .utils import TabularIndexer, TransitionException
 
 __all__ = [
     "ModelFree",
     "ModelFreePolicy",
     "EpsilonSoftPolicy",
     "TransitionException",
+    "TabularIndexer",
     "vq_pi_iter_naive",
     "value_iteration",
     "policy_iteration",

@@ -1,7 +1,8 @@
 import copy
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Sequence
 from time import perf_counter
-from typing import Any, Callable, Optional, Sequence, cast, override
+from typing import Any, Self, cast, override
 
 import numpy as np
 
@@ -39,7 +40,7 @@ differentiable, or hold a gradient method.
 """
 
 
-class Approximator(ABC):
+class Approximator[InputT](ABC):
     """Approximator base class that implements caster methods
     as well as defining the basic interface of any approximator.
     It has to be updateable and callable. Updatability implies
@@ -47,7 +48,7 @@ class Approximator(ABC):
     """
 
     @abstractmethod
-    def __call__(self, *args, **kwargs) -> float:
+    def __call__(self, x: InputT, /) -> float:
         """Return the value of the approximation"""
         raise NotImplementedError
 
@@ -56,18 +57,18 @@ class Approximator(ABC):
         """Update the approximator"""
         raise NotImplementedError
 
-    def copy(self, *args, **kwargs) -> Any:
+    def copy(self, *args: Any, **kwargs: Any) -> Self:
         """Return a copy of the approximator"""
         return copy.deepcopy(self)
 
-    def is_differentiable(self):
+    def is_differentiable(self) -> bool:
         grad = getattr(self, "grad", None)
         if grad:
             return True
         return False
 
 
-class DifferentiableApproximator(Approximator):
+class DifferentiableApproximator[InputT](Approximator[InputT]):
     @abstractmethod
     def grad(self, *args, **kwargs):
         raise NotImplementedError
@@ -77,8 +78,12 @@ class DifferentiableApproximator(Approximator):
     def w(self) -> Any:
         raise NotImplementedError
 
+    @w.setter
+    def w(self, new_val):
+        raise NotImplementedError
 
-class ModelFreeTLPolicy(Policy):
+
+class ModelFreeTLPolicy[StateT, ActionT](Policy[ActionT]):
     """ModelFreeTLPolicy is for approximated methods what
     ModelFreePolicy is for tabular methods.
 
@@ -88,7 +93,11 @@ class ModelFreeTLPolicy(Policy):
     there will exist an approximator.
     """
 
-    def __init__(self, actions: Sequence[Any], q_hat: Approximator):
+    def __init__(
+        self,
+        actions: Sequence[ActionT],
+        q_hat: Approximator[tuple[StateT, ActionT]],
+    ):
         self.actions = actions
         self.A = len(actions)
         self.q_hat = q_hat
@@ -97,42 +106,51 @@ class ModelFreeTLPolicy(Policy):
         self.q_hat.update(*args, **kwargs)
 
     @override
-    def __call__(self, state: Any, /) -> float:
+    def __call__(self, state: StateT, /) -> ActionT:
         action_idx = cast(
             int, np.argmax([self.q_hat((state, a)) for a in self.actions])
         )
         return self.actions[action_idx]
 
 
-class EpsSoftSALPolicy(ModelFreeTLPolicy):
-    def __init__(self, actions: Sequence[Any], q_hat: Approximator, eps: float = 0.1):
+class EpsSoftSALPolicy[StateT, ActionT](ModelFreeTLPolicy[StateT, ActionT]):
+    def __init__(
+        self,
+        actions: Sequence[ActionT],
+        q_hat: Approximator[tuple[StateT, ActionT]],
+        eps: float = 0.1,
+    ):
         super().__init__(actions, q_hat)
         self.eps = eps
 
-    def __call__(self, state):
+    def __call__(self, state: StateT) -> ActionT:
         if np.random.rand() < self.eps:
-            return np.random.choice(self.actions)
+            return self.actions[np.random.randint(self.A)]
         return super().__call__(state)
 
 
-class REINFORCEPolicy(ModelFreeTLPolicy):
-    def __init__(self, actions: Sequence[Any], pi_hat: DifferentiableApproximator):
+class REINFORCEPolicy[StateT, ActionT](ModelFreeTLPolicy[StateT, ActionT]):
+    def __init__(
+        self,
+        actions: Sequence[ActionT],
+        pi_hat: DifferentiableApproximator[tuple[StateT, ActionT]],
+    ):
         """Must be a differential approximator"""
         self.actions = actions
         self.pi_hat = pi_hat
         if not isinstance(self.pi_hat, DifferentiableApproximator):
             raise TypeError("Policy approximator pi_hat must be differentiable")
 
-    def grad_lnpi(self, s, a):
+    def grad_lnpi(self, s: StateT, a: ActionT) -> np.ndarray:
         pi_sa = self.pi_sa(s).reshape(-1, 1)
         grad_pi_sa = self.pi_hat.grad((s, a)).reshape(-1, 1)
         grads_pi_sa = np.array([self.pi_hat.grad((s, a_i)) for a_i in self.actions])
         return (grad_pi_sa - grads_pi_sa @ pi_sa).reshape(-1)
 
-    def update_policy(self, c: float, s: Any, a: Any):
+    def update_policy(self, c: float, s: StateT, a: ActionT) -> None:
         self.pi_hat.w += c * self.grad_lnpi(s, a)
 
-    def pi_sa(self, s: Any) -> np.ndarray:
+    def pi_sa(self, s: StateT) -> np.ndarray:
         pi_hat_sa = [self.pi_hat((s, a)) for a in self.actions]
         max_sa = max(pi_hat_sa)
         e_hsa = [np.exp(pi_hat_sa[i] - max_sa) for i in range(len(self.actions))]
@@ -140,12 +158,13 @@ class REINFORCEPolicy(ModelFreeTLPolicy):
         pi_sa = np.array([e_hsa[i] / denom for i in range(len(self.actions))])
         return pi_sa
 
-    def __call__(self, s: Any, /) -> float:
+    def __call__(self, s: StateT, /) -> ActionT:
         """default softmax implementation"""
-        return np.random.choice(self.actions, p=self.pi_sa(s))
+        action_idx = int(np.random.choice(len(self.actions), p=self.pi_sa(s)))
+        return self.actions[action_idx]
 
 
-class ModelFreeTL:
+class ModelFreeTL[StateT, ActionT]:
     """
     ModelFreeTL stands for Model Free Tabular Less, even if we have state,
     to approximate methods what ModelFree is to tabular ones.
@@ -161,9 +180,9 @@ class ModelFreeTL:
 
     def __init__(
         self,
-        transition: Transition,
-        rand_state: Callable,
-        policy: ModelFreeTLPolicy,
+        transition: Transition[StateT, ActionT],
+        rand_state: Callable[[], StateT],
+        policy: ModelFreeTLPolicy[StateT, ActionT],
         gamma: float = 1,
     ):
         self.policy = policy
@@ -172,38 +191,38 @@ class ModelFreeTL:
         self.gamma = gamma
         self._validate_transition()
 
-    def _validate_transition(self):
+    def _validate_transition(self) -> None:
         start = perf_counter()
         while perf_counter() - start < 2:
             rand_s = self.rand_state()
-            rand_a = np.random.choice(self.policy.actions)
+            rand_a = self.policy.actions[np.random.randint(self.policy.A)]
             try:
                 self.transition(rand_s, rand_a)
             except Exception as e:
                 raise TransitionException(f"Transition function is not valid: {e}")
 
-    def random_sa(self):
-        a = np.random.choice(self.policy.actions)
+    def random_sa(self) -> tuple[StateT, ActionT]:
+        a = self.policy.actions[np.random.randint(self.policy.A)]
         s = self.rand_state()
         return s, a
 
     def generate_episode(
         self,
-        s_0: Any,
-        a_0: Any,
-        policy: ModelFreeTLPolicy | None = None,
+        s_0: StateT,
+        a_0: ActionT,
+        policy: ModelFreeTLPolicy[StateT, ActionT] | None = None,
         max_steps: int = MAX_STEPS,
-    ) -> list[EpisodeStep]:
+    ) -> list[EpisodeStep[StateT, ActionT]]:
         """Generate an episode using given policy if any, otherwise
         use the one defined as the attribute"""
         policy = policy if policy else self.policy
-        episode: list[EpisodeStep] = []
+        episode: list[EpisodeStep[StateT, ActionT]] = []
         end = False
         step = 0
         s_t_1, a_t_1 = s_0, a_0
         while (not end) and (step < max_steps):
             (s_t, r_t), end = self.transition(s_t_1, a_t_1)
-            episode.append(EpisodeStep((s_t_1, cast(int, a_t_1), r_t)))
+            episode.append((s_t_1, a_t_1, r_t))
             a_t = policy(s_t)
             s_t_1, a_t_1 = s_t, a_t
             step += 1
@@ -211,12 +230,12 @@ class ModelFreeTL:
         return episode
 
     def step_transition(
-        self, state: Any, action: Any
-    ) -> tuple[tuple[Any, float], bool]:
+        self, state: StateT, action: ActionT
+    ) -> tuple[tuple[StateT, float], bool]:
         return self.transition(state, action)
 
 
-class SGDWA(DifferentiableApproximator):
+class SGDWA[InputT](DifferentiableApproximator[InputT]):
     """Stochastic Gradient Descent Weight-Vector Approximator
     for MSVE (mean square value error).
 
@@ -226,7 +245,7 @@ class SGDWA(DifferentiableApproximator):
     mean square value error VE, the prediction objective.
     """
 
-    def __init__(self, fs: int, basis: Optional[Callable[[Any], np.ndarray]] = None):
+    def __init__(self, fs: int, basis: Callable[[InputT], np.ndarray] | None = None):
         """
         Parameters
         ----------
@@ -254,27 +273,27 @@ class SGDWA(DifferentiableApproximator):
         self._w = new_w
         return self._w
 
-    def grad(self, x: Any) -> np.ndarray:
+    def grad(self, x: InputT) -> np.ndarray:
         """Return the gradient of the approximation"""
         return self.basis(x)
 
-    def delta_w(self, U: float, alpha: float, x: Any, g: np.ndarray) -> np.ndarray:
+    def delta_w(self, U: float, alpha: float, x: InputT, g: np.ndarray) -> np.ndarray:
         """g: vector value, either gradient or elegibility trace"""
         return alpha * (U - self(x)) * g
 
-    def et_update(self, U: float, alpha: float, x: Any, z: np.ndarray) -> np.ndarray:
+    def et_update(self, U: float, alpha: float, x: InputT, z: np.ndarray) -> np.ndarray:
         """Updates inplace with elegibility traces the weight vector"""
         dw = self.delta_w(U, alpha, x, z)
         self.w = self.w + dw
         return dw
 
-    def update(self, U: float, alpha: float, x: Any) -> np.ndarray:
+    def update(self, U: float, alpha: float, x: InputT) -> np.ndarray:
         """Updates inplace the weight vector and returns update just in case"""
         dw = self.delta_w(U, alpha, x, self.grad(x))
         self.w = self.w + dw
         return dw
 
-    def __call__(self, x: Any, /) -> float:
+    def __call__(self, x: InputT, /) -> float:
         return np.dot(self.w, self.basis(x))
 
 

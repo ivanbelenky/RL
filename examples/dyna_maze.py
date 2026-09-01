@@ -1,9 +1,7 @@
-from typing import cast
-
 import matplotlib.pyplot as plt
 import numpy as np
 
-from rl import ModelFree, ModelFreePolicy, dynaq
+from rl import ModelFree, dynaq
 
 plt.style.use("dark_background")
 
@@ -62,7 +60,7 @@ def obstacle_maze(state, action):
 )
 
 # plot found policy
-policy = cast(ModelFreePolicy, pi)
+policy = pi
 mf = ModelFree(states, actions, obstacle_maze, gamma=0.95, policy=policy)
 
 lrud = ["<", ">", "^", "v"]
@@ -131,6 +129,9 @@ for i in range(SMOOTH):
     steps_per_episode = []
     for s0, s5, s50 in zip(samples_0, samples_5, samples_50):
         pi0, pi5, pi50 = s0[3], s5[3], s50[3]
+        if pi0 is None or pi5 is None or pi50 is None:
+            continue
+
         a0, a5, a50 = pi0(init_state), pi5(init_state), pi50(init_state)
 
         ep0 = model.generate_episode(START_XY, actions[a0], policy=pi0)

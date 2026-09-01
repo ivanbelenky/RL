@@ -1,7 +1,8 @@
 """RL Copyright © 2023 Iván Belenky"""
 
 from abc import ABC, abstractmethod
-from typing import Literal
+from collections.abc import Hashable
+from typing import Any, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -22,7 +23,7 @@ PROB_TOL = 1e-3
 ESTIMATE_ITERS = int(1e3)
 
 
-class MarkovReward[S: int, A: int](ABC):
+class MarkovReward(ABC):
     @property
     @abstractmethod
     def states(self) -> int:
@@ -94,7 +95,7 @@ class RandomMarkovReward(MarkovReward):
         return self._reward_gen()
 
 
-class MarkovPolicy(Policy):
+class MarkovPolicy(Policy[int]):
     """
     Markov Policy is a policy that is defined by a matrix of size SxA.
     This class admits a policy defined by the user or a equally probable
@@ -120,7 +121,7 @@ class MarkovPolicy(Policy):
         s and a are ignored. If pi_sa is not provided then s and a must be
         provided.
         """
-        if pi_sa:
+        if pi_sa is not None:
             self.pi_sa = pi_sa
             sa: tuple[int, int] = self.pi_sa.shape
             self.s, self.a = sa
@@ -153,7 +154,7 @@ class MarkovPolicy(Policy):
         max_q_sa = np.array([q_sa[a] == max_q for a in range(self.a)])
         return max_q_sa / sum(max_q_sa)
 
-    def π(self, state: int):
+    def π(self, state: int) -> np.ndarray:
         """
         π(a|s=state)
         """
@@ -164,10 +165,10 @@ class MarkovPolicy(Policy):
         Collapses the policy to a single action, i.e. a sample from the
         random variable that represents the policy.
         """
-        return np.random.choice(self.pi_sa[state], p=self.pi_sa[state])
+        return int(np.random.choice(self.a, p=self.pi_sa[state]))
 
 
-class MDP[S: int, A: int]:
+class MDP[StateT: Hashable, ActionT: Hashable]:
     VQ_PI_SOLVERS = {"iter_n": vq_pi_iter_naive}
 
     OPTIMAL_POLICY_SOLVERS = {
@@ -175,24 +176,24 @@ class MDP[S: int, A: int]:
         "value_iteration": value_iteration,
     }
 
-    SAS = tuple[S, A, S]
-
     def __init__(
         self,
-        p_s: np.ndarray[SAS],
-        states: SizedIterable[S],
-        actions: SizedIterable[A],
+        p_s: NDArray[Any],
+        states: SizedIterable[StateT],
+        actions: SizedIterable[ActionT],
         reward_gen: MarkovReward,
         gamma: float = 0.9,
         policy: MarkovPolicy | None = None,
     ):
-        self.p_s: np.ndarray[self.SAS] = p_s  # transition function
-        self.gamma: int | float = gamma
-        self.reward_gen: MarkovReward = reward_gen
+        self.p_s = p_s  # transition function
+        self.gamma = gamma
+        self.reward_gen = reward_gen
 
-        self.states = State(states)
-        self.actions = Action(actions)
-        self.stateaction = StateAction([(s, a) for s in states for a in actions])
+        self.states: State[StateT] = State(states)
+        self.actions: Action[ActionT] = Action(actions)
+        self.stateaction: StateAction[StateT, ActionT] = StateAction(
+            [(s, a) for s in states for a in actions]
+        )
 
         self.policy: MarkovPolicy = policy or MarkovPolicy(
             s=self.states.N,
@@ -228,7 +229,7 @@ class MDP[S: int, A: int]:
     def vq_pi(
         self,
         method: Literal["iter_n"] = "iter_n",
-    ) -> VQPi:
+    ) -> VQPi[StateT, ActionT, MarkovPolicy]:
         """
         Individual state value functions and action-value functions
         vpi and qpi cannot be calculated for bigger problems. That
@@ -243,7 +244,7 @@ class MDP[S: int, A: int]:
     def optimize_policy(
         self,
         method: Literal["policy_iteration", "value_iteration"] = "policy_iteration",
-    ) -> VQPi:
+    ) -> VQPi[StateT, ActionT, MarkovPolicy]:
         """
         Optimal policy is the policy that maximizes the expected
         discounted return. It is the policy that maximizes the

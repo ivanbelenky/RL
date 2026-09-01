@@ -2,14 +2,12 @@
 RL - Copyright © 2023 Iván Belenky @Leculette
 """
 
-from typing import (
-    Any,
-    Callable,
-    Sequence,
-)
+from collections.abc import Hashable, Sized
+from typing import Literal, overload
 
 import numpy as np
 
+from rl.types import SizedIterable
 from rl.utils import (
     MAX_STEPS,
     Action,
@@ -17,12 +15,13 @@ from rl.utils import (
     Policy,
     State,
     StateAction,
+    Transition,
     TransitionException,
 )
 
 
-class ModelFreePolicy(Policy):
-    def __init__(self, A: Sequence[Any] | int, S: Sequence[Any] | int):
+class ModelFreePolicy(Policy[int]):
+    def __init__(self, A: Sized | int, S: Sized | int):
         if not isinstance(A, int):
             A = len(A)
         if not isinstance(S, int):
@@ -31,26 +30,26 @@ class ModelFreePolicy(Policy):
         self.S = S
         self.pi = np.ones((S, A)) / A
 
-    def __call__(self, state: int):
+    def __call__(self, state: int) -> int:
         return np.random.choice(self.A, p=self.pi[state])
 
-    def pi_as(self, action: int, state: int):
+    def pi_as(self, action: int, state: int) -> float:
         return self.pi[state, action]
 
-    def update_policy(self, q, s):
+    def update_policy(self, q: np.ndarray, s: int) -> None:
         qs_mask = q[s] == np.max(q[s])
         self.pi[s] = np.where(qs_mask, 1.0 / qs_mask.sum(), 0)
 
-    def _make_deterministic(self):
+    def _make_deterministic(self) -> None:
         self.pi = np.eye(self.A)[np.argmax(self.pi, axis=1)]
 
 
 class EpsilonSoftPolicy(ModelFreePolicy):
-    def __init__(self, A, S, eps):
+    def __init__(self, A: Sized | int, S: Sized | int, eps: float):
         super().__init__(A, S)
         self.Ɛ = eps
 
-    def update_policy(self, q, s):
+    def update_policy(self, q: np.ndarray, s: int) -> None:
         # if there are multiple actions with the same value,
         # then we choose one of them randomly
         max_q = np.max(q[s])
@@ -59,7 +58,7 @@ class EpsilonSoftPolicy(ModelFreePolicy):
         self.pi[s, qs_mask] += (1 - self.Ɛ) / qs_mask.sum()
 
 
-class ModelFree:
+class ModelFree[StateT: Hashable, ActionT: Hashable]:
     """
     ModelFree is the base holder of the states, actions, and
     the transition defining an environment.
@@ -73,38 +72,50 @@ class ModelFree:
 
     def __init__(
         self,
-        states: Sequence[Any],
-        actions: Sequence[Any],
-        transition: Callable,
+        states: SizedIterable[StateT],
+        actions: SizedIterable[ActionT],
+        transition: Transition[StateT, ActionT],
         gamma: float = 1,
         policy: ModelFreePolicy | None = None,
     ):
-        self.states = State(states)
-        self.actions = Action(actions)
-        self.stateaction = StateAction([(s, a) for s, a in zip(states, actions)])
+        self.states: State[StateT] = State(states)
+        self.actions: Action[ActionT] = Action(actions)
+        self.stateaction: StateAction[StateT, ActionT] = StateAction(
+            [(s, a) for s in states for a in actions]
+        )
         self.transition = transition
         self.gamma = gamma
         self.policy = policy or ModelFreePolicy(self.actions.N, self.states.N)
 
         self._validate_transition()
 
-    def init_vq(self):
+    def init_vq(self) -> tuple[np.ndarray, np.ndarray]:
         v = np.zeros(self.states.N)
         q = np.zeros((self.states.N, self.actions.N))
         return v, q
 
-    def random_sa(self, value=False):
-        s = self.states.random(value)
-        a = self.actions.random(value)
-        return s, a
+    @overload
+    def random_sa(self, value: Literal[False] = False) -> tuple[int, int]: ...
 
-    def _to_index(self, state, action):
-        state = self.states.get_index(state)
-        action = self.actions.get_index(action)
+    @overload
+    def random_sa(self, value: Literal[True]) -> tuple[StateT, ActionT]: ...
 
-        return state, action
+    @overload
+    def random_sa(self, value: bool) -> tuple[int, int] | tuple[StateT, ActionT]: ...
 
-    def _validate_transition(self):
+    def random_sa(
+        self, value: bool = False
+    ) -> tuple[int, int] | tuple[StateT, ActionT]:
+        if value:
+            return self.states.random(True), self.actions.random(True)
+        return self.states.random(), self.actions.random()
+
+    def _to_index(self, state: StateT, action: ActionT) -> tuple[int, int]:
+        state_idx = self.states.get_index(state)
+        action_idx = self.actions.get_index(action)
+        return state_idx, action_idx
+
+    def _validate_transition(self) -> None:
         states = self.states.seq
         actions = self.actions.seq
         sa = [(s, a) for s in states for a in actions]
@@ -125,9 +136,9 @@ class ModelFree:
 
     def __validate_transition(
         self,
-        state: Any,
-        action: Any,
-    ) -> tuple[tuple[Any, float | int], bool]:
+        state: StateT,
+        action: ActionT,
+    ) -> tuple[tuple[StateT, float], bool]:
         try:
             (s, r), end = self.transition(state, action)
         except Exception as e:
@@ -151,13 +162,13 @@ class ModelFree:
 
     def generate_episode(
         self,
-        s_0: Any,
-        a_0: Any | None = None,
-        policy: ModelFreePolicy | None = None,
+        s_0: StateT,
+        a_0: ActionT | None = None,
+        policy: Policy[int] | None = None,
         max_steps: int = MAX_STEPS,
-    ) -> list[EpisodeStep]:
+    ) -> list[EpisodeStep[int, int]]:
         policy = policy or self.policy
-        episode: list[EpisodeStep] = []
+        episode: list[EpisodeStep[int, int]] = []
         end = False
         step = 0
         s_t_1 = s_0
@@ -168,7 +179,7 @@ class ModelFree:
         while (not end) and (step < max_steps):
             (s_t, r_t), end = self.transition(s_t_1, a_t_1)
             (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
-            episode.append(EpisodeStep((_s, _a, _r)))
+            episode.append((_s, _a, _r))
             a_t = policy(self.states.get_index(s_t))
             s_t_1, a_t_1 = s_t, self.actions.from_index(a_t)
 

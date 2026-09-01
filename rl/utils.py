@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import Callable, Hashable, Sequence
 from copy import deepcopy
 from functools import partial
-from typing import Any, Callable, Literal, NewType, Self, Sequence
+from typing import Any, Literal, NamedTuple, Self, cast, overload
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,12 +19,12 @@ MEAN_ITERS = int(1e4)
 W_INIT = 1e-3
 
 
-class Policy(ABC):
+class Policy[ActionT](ABC):
     def __init__(self):
         pass
 
     @abstractmethod
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, *args: Any, **kwargs: Any) -> ActionT:
         raise NotImplementedError
 
     @abstractmethod
@@ -31,109 +32,151 @@ class Policy(ABC):
         raise NotImplementedError
 
 
-class _TabularIndexer:
+class TabularIndexer[T: Hashable]:
     """Simple proxy for tabular state & actions."""
 
-    def __init__(self, seq: SizedIterable[Any] | Sequence[Any]):
-        self.seq = seq
-        self.N = len(seq)
-        self.index = {v: i for i, v in enumerate(seq)}
-        self.revindex = {i: v for i, v in enumerate(seq)}
+    def __init__(self, seq: SizedIterable[T]):
+        self.seq = tuple(seq)
+        self.N = len(self.seq)
+        self.index: dict[T, int] = {v: i for i, v in enumerate(self.seq)}
+        self.revindex: dict[int, T] = {i: v for i, v in enumerate(self.seq)}
 
-    def get_index(self, v) -> Any:
+    def get_index(self, v: T) -> int:
         return self.index[v]
 
-    def from_index(self, idx) -> Any:
+    def from_index(self, idx: int) -> T:
         return self.revindex[idx]
 
-    def random(self, value=False):
-        rnd_idx = np.random.choice(self.N)
+    @overload
+    def random(self, value: Literal[False] = False) -> int: ...
+
+    @overload
+    def random(self, value: Literal[True]) -> T: ...
+
+    @overload
+    def random(self, value: bool) -> int | T: ...
+
+    def random(self, value: bool = False) -> int | T:
+        rnd_idx = int(np.random.choice(self.N))
         if value:
             return self.seq[rnd_idx]
         return rnd_idx
 
     @classmethod
-    def from_indexable(cls, indexable: _TabularIndexable):
+    @overload
+    def from_indexable(cls, indexable: int) -> TabularIndexer[int]: ...
+
+    @classmethod
+    @overload
+    def from_indexable[ItemT: Hashable](
+        cls, indexable: SizedIterable[ItemT]
+    ) -> TabularIndexer[ItemT]: ...
+
+    @classmethod
+    def from_indexable[ItemT: Hashable](
+        cls, indexable: SizedIterable[ItemT] | int
+    ) -> TabularIndexer[ItemT] | TabularIndexer[int]:
         match indexable:
-            case np.ndarray():
-                return cls(indexable)  # type: ignore NOTE: error will be raised downstream if indexable is a non dimensional array
             case int():
-                return cls([i for i in range(indexable)])
+                return cast(TabularIndexer[int], cls(range(indexable)))
             case _:
-                raise ValueError(f"Cannot index this type: {type(indexable)}")
+                if isinstance(indexable, SizedIterable):
+                    return cast(TabularIndexer[ItemT], cls(indexable))
+                raise TypeError(f"Cannot index this type: {type(indexable)}")
 
 
-class State(_TabularIndexer):
+class State[T: Hashable](TabularIndexer[T]):
     pass
 
 
-class Action(_TabularIndexer):
+class Action[T: Hashable](TabularIndexer[T]):
     pass
 
 
-class StateAction(_TabularIndexer):
+class StateAction[StateT: Hashable, ActionT: Hashable](
+    TabularIndexer[tuple[StateT, ActionT]]
+):
     pass
 
 
-_TabularIndexable = np.ndarray | int
+_TabularIndexer = TabularIndexer
+type _TabularIndexable[T: Hashable] = TabularIndexer[T] | SizedIterable[T]
 
 
-class _TabularValues:
-    def __init__(self, values: np.ndarray, idx: _TabularIndexer | _TabularIndexable):
+class _TabularValues[T: Hashable]:
+    def __init__(self, values: np.ndarray, idx: _TabularIndexable[T]):
         self.v = values
-        if not isinstance(idx, _TabularIndexer):
-            self.idx: _TabularIndexer = _TabularIndexer.from_indexable(idx)
+        if not isinstance(idx, TabularIndexer):
+            self.idx: TabularIndexer[T] = TabularIndexer(idx)
         else:
-            self.idx: _TabularIndexer = idx
+            self.idx = idx
 
         self.idx_val = {k: v for k, v in zip(self.idx.index.keys(), values)}
 
-    def values(self):
+    def values(self) -> np.ndarray:
         return self.v
 
     def copy(self) -> Self:
         return deepcopy(self)
 
 
-class Vpi(_TabularValues):
+class Vpi[T: Hashable](_TabularValues[T]):
     def __str__(self):
         return f"Vpi({self.v[:5]}...)"
 
 
-class Qpi(_TabularValues):
+class Qpi[T: Hashable](_TabularValues[T]):
     def __str__(self):
         return f"Vpi({self.v[:5]}...)"
 
 
-VQPi = NewType("VQPi", tuple[Vpi, Qpi, Policy])
-Sample = NewType("Sample", tuple[int, Vpi, Qpi, Policy | None])
-Samples = NewType("Samples", list[Sample])
-Transition = Callable[[Any, Any], tuple[tuple[Any, float], bool]]
-EpisodeStep = NewType("EpisodeStep", tuple[int, int, float])
+class VQPi[StateT: Hashable, ActionT: Hashable, PolicyT: Policy[int]](NamedTuple):
+    v: Vpi[StateT]
+    q: Qpi[tuple[StateT, ActionT]]
+    policy: PolicyT
+
+
+class Sample[StateT: Hashable, ActionT: Hashable, PolicyT: Policy[int]](NamedTuple):
+    iteration: int
+    v: Vpi[StateT]
+    q: Qpi[tuple[StateT, ActionT]]
+    policy: PolicyT | None
+
+
+class Samples[StateT: Hashable, ActionT: Hashable, PolicyT: Policy[int]](
+    list[Sample[StateT, ActionT, PolicyT]]
+):
+    pass
+
+
+type Transition[StateT, ActionT] = Callable[
+    [StateT, ActionT], tuple[tuple[StateT, float], bool]
+]
+type EpisodeStep[StateT, ActionT] = tuple[StateT, ActionT, float]
 
 
 class TransitionException(Exception):
     pass
 
 
-class PQueue:
+class PQueue[T]:
     """Priority Queue"""
 
-    def __init__(self, items: list[tuple[float, Any]]):
+    def __init__(self, items: list[tuple[float, T]]):
         self.items = items
         self._sort()
 
     def _sort(self):
         self.items.sort(key=lambda x: x[0])
 
-    def push(self, item, priority):
+    def push(self, item: T, priority: float) -> None:
         self.items.append((priority, item))
         self._sort()
 
-    def pop(self):
+    def pop(self) -> T:
         return self.items.pop(0)[1]
 
-    def empty(self):
+    def empty(self) -> bool:
         return len(self.items) == 0
 
 
@@ -192,23 +235,37 @@ class RandomRewardGenerator:
         return generator(*args, **kwargs)
 
 
-class UCTNode:
-    def __init__(self, state, action, q, n, parent=None, is_terminal=False):
+class UCTNode[StateT, ActionT: Hashable]:
+    def __init__(
+        self,
+        state: StateT,
+        action: ActionT | None,
+        q: float,
+        n: int,
+        parent: UCTNode[StateT, ActionT] | None = None,
+        is_terminal: bool = False,
+    ):
         self.state = state
         self.action = action
         self.q = q
         self.n = n
         self.parent = parent
-        self.children: dict[Action, UCTNode] = {}
-        self.is_terminal = False
+        self.children: dict[ActionT, UCTNode[StateT, ActionT]] = {}
+        self.is_terminal = is_terminal
 
-    def add_child(self, child):
-        self.children[child.action] = child
+    def add_child(self, child: UCTNode[StateT, ActionT]) -> UCTNode[StateT, ActionT]:
+        self.children[cast(ActionT, child.action)] = child
         return child
 
 
-class UCTree:
-    def __init__(self, root, Cp=1.0, max_steps=MAX_STEPS, nodes=None):
+class UCTree[StateT, ActionT: Hashable]:
+    def __init__(
+        self,
+        root: StateT | UCTNode[StateT, ActionT],
+        Cp: float = 1.0,
+        max_steps: int = MAX_STEPS,
+        nodes: dict[StateT, UCTNode[StateT, ActionT]] | None = None,
+    ):
         if not isinstance(root, UCTNode):
             self.root = UCTNode(root, None, 0, 1, None)
         else:
@@ -231,7 +288,9 @@ class UCTree:
         max_depth = self.max_depth()
         width = 4 * max_depth
         height = max_depth
-        stack: list[tuple[UCTNode, int, float, float]] = [(self.root, 0, 0, width)]
+        stack: list[tuple[UCTNode[StateT, ActionT], int, float, float]] = [
+            (self.root, 0, 0, width)
+        ]
         treenodes = []
         lines = []
         while stack:

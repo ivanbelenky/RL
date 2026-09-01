@@ -85,7 +85,7 @@ def main():
     print(r_sa[:, 3].reshape(GRID_SIZE, GRID_SIZE))
 
     # Define the Markov Decision Process
-    mdp = MDP(p_s, states, actions, gamma=0.9, reward_gen=TabularReward(r_sa))  # type: ignore
+    mdp = MDP(p_s, states, actions, gamma=0.9, reward_gen=TabularReward(r_sa))
 
     # calculate beforehand
     vq_pi = mdp.vq_pi()
