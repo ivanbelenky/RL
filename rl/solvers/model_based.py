@@ -88,7 +88,7 @@ def _vq_pi_iter_naive[StateT: Hashable, ActionT: Hashable](
     p_s = mdp.p_s
 
     v_i = np.ones(mdp.states.N)
-    diff_norm = TOL * 2
+    diff_norm = np.inf
 
     update_step = ITER_NAIVE_STEP_MAP["inplace" if inplace else "naive"]
 
@@ -190,7 +190,7 @@ def _value_iteration[StateT: Hashable, ActionT: Hashable](
     p_s = mdp.p_s
 
     v_i = np.ones(mdp.states.N)
-    diff_norm = TOL * 2
+    diff_norm = np.inf
 
     update_step = VALUE_ITERATION_STEP_MAP["inplace" if inplace else "naive"]
 
@@ -201,10 +201,11 @@ def _value_iteration[StateT: Hashable, ActionT: Hashable](
     n_iter = 0
     while (n_iter < max_iters) and (diff_norm > tol):
         v_i_1 = v_i.copy()
-        v_i, q_i = update_step(mdp, v_i, v_i_1, r_sa, p_s, γ)
+        v_i, _ = update_step(mdp, v_i, v_i_1, r_sa, p_s, γ)
         diff_norm = lnorm(v_i - v_i_1)
         n_iter += 1
 
+    q_i = r_sa + γ * (p_s @ v_i).T
     policy.update_policy(q_i)
     return Vpi(v_i, mdp.states), Qpi(q_i, mdp.stateaction)
 

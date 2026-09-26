@@ -163,3 +163,9 @@ cython_debug/
 # dstore
 .DS_Store
 .ruff_cache/
+
+
+# scratch and tmp
+
+scratch/
+tmp/

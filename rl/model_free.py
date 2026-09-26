@@ -180,6 +180,8 @@ class ModelFree[StateT: Hashable, ActionT: Hashable]:
             (s_t, r_t), end = self.transition(s_t_1, a_t_1)
             (_s, _a), _r = self._to_index(s_t_1, a_t_1), r_t
             episode.append((_s, _a, _r))
+            if end:
+                break
             a_t = policy(self.states.get_index(s_t))
             s_t_1, a_t_1 = s_t, self.actions.from_index(a_t)
 

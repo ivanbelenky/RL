@@ -136,16 +136,16 @@ class REINFORCEPolicy[StateT, ActionT](ModelFreeTLPolicy[StateT, ActionT]):
         pi_hat: DifferentiableApproximator[tuple[StateT, ActionT]],
     ):
         """Must be a differential approximator"""
-        self.actions = actions
-        self.pi_hat = pi_hat
-        if not isinstance(self.pi_hat, DifferentiableApproximator):
+        if not isinstance(pi_hat, DifferentiableApproximator):
             raise TypeError("Policy approximator pi_hat must be differentiable")
+        super().__init__(actions, pi_hat)
+        self.pi_hat = pi_hat
 
     def grad_lnpi(self, s: StateT, a: ActionT) -> np.ndarray:
-        pi_sa = self.pi_sa(s).reshape(-1, 1)
-        grad_pi_sa = self.pi_hat.grad((s, a)).reshape(-1, 1)
+        pi_sa = self.pi_sa(s)
+        grad_pi_sa = self.pi_hat.grad((s, a))
         grads_pi_sa = np.array([self.pi_hat.grad((s, a_i)) for a_i in self.actions])
-        return (grad_pi_sa - grads_pi_sa @ pi_sa).reshape(-1)
+        return grad_pi_sa - pi_sa @ grads_pi_sa
 
     def update_policy(self, c: float, s: StateT, a: ActionT) -> None:
         self.pi_hat.w += c * self.grad_lnpi(s, a)
@@ -223,6 +223,8 @@ class ModelFreeTL[StateT, ActionT]:
         while (not end) and (step < max_steps):
             (s_t, r_t), end = self.transition(s_t_1, a_t_1)
             episode.append((s_t_1, a_t_1, r_t))
+            if end:
+                break
             a_t = policy(s_t)
             s_t_1, a_t_1 = s_t, a_t
             step += 1

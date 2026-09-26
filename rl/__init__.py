@@ -2,7 +2,6 @@ from .model_free import EpsilonSoftPolicy, ModelFree, ModelFreePolicy
 from .solvers.approx import (
     diff_semigradn,
     gradient_mc,
-    lstd,
     reinforce_mc,
     semigrad_td_lambda,
     semigrad_tdn,
@@ -13,7 +12,6 @@ from .solvers.planning import (
     dynaq,
     mcts,
     priosweep,
-    rtdp,
     t_sampling,
 )
 from .tiles import IHT, tiles
@@ -36,14 +34,11 @@ __all__ = [
     "priosweep",
     "t_sampling",
     "mcts",
-    "rtdp",
     "gradient_mc",
     "semigrad_tdn",
-    "lstd",
     "semigrad_td_lambda",
     "diff_semigradn",
     "reinforce_mc",
-    "Tile",
     "tiles",
     "IHT",
 ]

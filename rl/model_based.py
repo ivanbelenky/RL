@@ -24,11 +24,6 @@ ESTIMATE_ITERS = int(1e3)
 
 
 class MarkovReward(ABC):
-    @property
-    @abstractmethod
-    def states(self) -> int:
-        raise NotImplementedError
-
     @abstractmethod
     def generate(self, state: int, action: int) -> float:
         raise NotImplementedError
@@ -45,10 +40,12 @@ class MarkovReward(ABC):
         r(s,a) = E[Rt|St-1 = s, At-1 = a]
         """
         p = p_s[state][action]
-        r = 0
-        for i, ps in enumerate(p):
-            r += ps * np.mean([self.r_sas(next_state=s) for s in range(self.states)])
-        return r
+        return float(
+            sum(
+                probability * self.r_sas(next_state)
+                for next_state, probability in enumerate(p)
+            )
+        )
 
 
 class TabularReward(MarkovReward):
@@ -82,7 +79,7 @@ class TabularReward(MarkovReward):
 
 
 class RandomMarkovReward(MarkovReward):
-    def __init__(self, reward_generator: RandomRewardGenerator | None):
+    def __init__(self, reward_generator: RandomRewardGenerator | None = None):
         self._reward_gen = reward_generator or RandomRewardGenerator("gaussian", 0, 1)
 
     def generate(self, state: int = 0, action: int = 0) -> float:

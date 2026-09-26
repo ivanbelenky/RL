@@ -801,19 +801,19 @@ def semigrad_td_lambda[StateT, ActionT: Hashable](
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeTL(transition, random_state, policy)
+    model = ModelFreeTL(transition, random_state, policy, gamma=gamma)
     vh, qh, samples = _td_lambda(
-        model,
-        v_hat,
-        state_0,
-        action_0,
-        alpha,
-        lambdaa,
-        int(n_episodes),
-        int(max_steps),
-        tol,
-        optimize,
-        sample_step,
+        MFS=model,
+        v_hat=v_hat,
+        s_0=state_0,
+        a_0=action_0,
+        alpha=alpha,
+        lambdaa=lambdaa,
+        n_episodes=int(n_episodes),
+        max_steps=int(max_steps),
+        tol=tol,
+        sample_step=sample_step,
+        optimize=optimize,
     )
 
     return AVQPi(vh, qh, policy), samples
@@ -850,21 +850,26 @@ def _td_lambda(
         T = int(max_steps)
         for _ in range(T):
             (s_, r), end = MFS.step_transition(s, a)
-            if end:
-                break
-            else:
-                a = π(s)
             zv = γ * λ * zv + v_hat.grad(s)
             zq = γ * λ * zq + q_hat.grad((s, a))
-            Uv = r + γ * v_hat(s_)
-            Uq = r + γ * q_hat(s_, a)
+
+            if end:
+                Uv = r
+                Uq = r
+                a_ = None
+            else:
+                a_ = π(s_)
+                Uv = r + γ * v_hat(s_)
+                Uq = r + γ * q_hat((s_, a_))
 
             v_hat.et_update(Uv, α, s, zv)
 
             if optimize:
                 q_hat.et_update(Uq, α, (s, a), zq)
 
-            s = s_
+            if end:
+                break
+            s, a = s_, a_
 
         dnorm = lnorm(w_old - v_hat.w)
 
@@ -956,7 +961,7 @@ def reinforce_mc[StateT, ActionT: Hashable](
 
     sample_step = _get_sample_step(samples, n_episodes)
 
-    model = ModelFreeTL(transition, random_state, policy)
+    model = ModelFreeTL(transition, random_state, policy, gamma=gamma)
     pi, samples = _reinforce_mc(
         model,
         state_0,
