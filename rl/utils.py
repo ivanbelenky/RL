@@ -74,14 +74,15 @@ class TabularIndexer[T: Hashable]:
 
     @classmethod
     def from_indexable[ItemT: Hashable](
-        cls, indexable: SizedIterable[ItemT] | int
+        cls: type[TabularIndexer[Any]],
+        indexable: SizedIterable[ItemT] | int,
     ) -> TabularIndexer[ItemT] | TabularIndexer[int]:
         match indexable:
             case int():
-                return cast(TabularIndexer[int], cls(range(indexable)))
+                return cls(range(indexable))
             case _:
                 if isinstance(indexable, SizedIterable):
-                    return cast(TabularIndexer[ItemT], cls(indexable))
+                    return cls(indexable)
                 raise TypeError(f"Cannot index this type: {type(indexable)}")
 
 
